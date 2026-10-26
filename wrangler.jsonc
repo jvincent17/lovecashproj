@@ -1,0 +1,9 @@
+{
+  // Konfigurasi Cloudflare Workers: sajikan hasil build Vite sebagai web statis (SPA)
+  "name": "lovecashproj",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
