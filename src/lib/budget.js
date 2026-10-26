@@ -39,11 +39,16 @@ export function allocate(units, total, overrides = {}) {
   return { amounts: out, overAllocated: fixed > total ? fixed - total : 0 }
 }
 
-/** Susun rencana budget lengkap untuk satu periode. */
-export function computePlan({ period, fixedItems = [], overrides = [] }) {
-  const salary = Number(period.salary) || 0
-  const fixedTotal = fixedItems.reduce((s, f) => s + Number(f.amount), 0)
-  const flexible = Math.max(0, salary - fixedTotal)
+/**
+ * Susun rencana budget lengkap untuk satu periode.
+ * incomes: pemasukan periode ini; bills: tagihan yang jatuh tempo di periode ini.
+ * Budget fleksibel = total pemasukan − semua tagihan (dicentang maupun belum).
+ */
+export function computePlan({ period, incomes = [], bills = [], overrides = [] }) {
+  const income = incomes.reduce((s, i) => s + Number(i.amount), 0)
+  const billsTotal = bills.reduce((s, b) => s + Number(b.amount), 0)
+  const billsPaid = bills.filter((b) => b.paid).reduce((s, b) => s + Number(b.amount), 0)
+  const flexible = Math.max(0, income - billsTotal)
 
   const weekOv = {}
   const dayOv = {}
@@ -72,8 +77,9 @@ export function computePlan({ period, fixedItems = [], overrides = [] }) {
   })
 
   return {
-    salary,
-    fixedTotal,
+    income,
+    billsTotal,
+    billsPaid,
     flexible,
     overAllocated: wAlloc.overAllocated,
     weeks: outWeeks,

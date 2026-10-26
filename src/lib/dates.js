@@ -55,3 +55,11 @@ export const fmtDay = (iso) => DAY[fromISO(iso).getDay()]
 export const fmtShort = (iso) => { const d = fromISO(iso); return `${d.getDate()} ${MON[d.getMonth()]}` }
 export const fmtLong = (iso) => { const d = fromISO(iso); return `${DAY_LONG[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}` }
 export const fmtRange = (a, b) => `${fmtShort(a)} – ${fmtShort(b)}`
+
+/** Tambah n bulan, tanggal dibatasi ke akhir bulan (31 Jan + 1 bln = 28/29 Feb). */
+export function addMonths(iso, n) {
+  const d = fromISO(iso)
+  const t = new Date(d.getFullYear(), d.getMonth() + n, 1)
+  t.setDate(Math.min(d.getDate(), daysInMonth(t.getFullYear(), t.getMonth())))
+  return toISO(t)
+}

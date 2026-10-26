@@ -3,7 +3,7 @@
 Web app untuk mengatur gaji bulanan, budget mingguan dan harian (sisa atau minus dibawa ke hari berikutnya), pengeluaran per kategori, serta hutang dan piutang.
 Responsif untuk desktop dan mobile.
 
-**Stack:** React + Vite + Tailwind CSS · Supabase (login & database) · Cloudflare Pages (hosting)
+**Stack:** React + Vite + Tailwind CSS · Supabase (login & database) · Cloudflare Workers (hosting, lihat `wrangler.jsonc`)
 
 ---
 
@@ -67,15 +67,16 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 
 ---
 
-## Cara kerja budget
+## Cara kerja
 
-- **Periode** dimulai dari tanggal gajian sampai sehari sebelum gajian berikutnya. Tanggal gajian diatur di Pengaturan.
-- **Budget fleksibel** = Gaji − Pos tetap (tagihan, tabungan, cicilan).
-- Budget fleksibel dibagi ke **minggu** (per 7 hari sejak tanggal gajian; sisa hari ≤ 3 digabung ke minggu terakhir), lalu dibagi ke **hari**.
-- Budget minggu atau hari bisa diubah manual. Minggu atau hari lain akan menyesuaikan otomatis supaya totalnya tetap sama.
-- **Sisa harian dibawa ke hari berikutnya.** Hemat hari ini berarti jatah besok bertambah, boros hari ini berarti jatah besok berkurang.
-- Pos tetap jenis **Cicilan** bisa dihubungkan ke hutang. Saat dicentang "sudah dibayar", otomatis tercatat sebagai pembayaran hutang.
-- Saat membuat periode baru, pos tetap dari periode sebelumnya otomatis disalin.
+- **Cashflow bersama:** semua data milik satu cashflow (dompet). Di **Pengaturan** ada kode undangan 6 huruf. Pasangan cukup memilih **Gabung dengan kode**, lalu keduanya melihat dan mengisi data yang sama.
+- **Login** bisa memakai username atau email. Username diatur di Pengaturan → Profil.
+- **Periode** berjalan dari tanggal gajian sampai sehari sebelum gajian berikutnya.
+- **Pemasukan** bisa lebih dari satu per periode (Gaji, Bonus, Freelance, dll.).
+- **Tagihan** masuk ke periode sesuai tanggal jatuh temponya, dan bisa dilihat untuk bulan ini maupun bulan depan. Tagihan yang dicentang (sudah dibayar) mengurangi **Saldo**. Tagihan bertanda "ulangi setiap bulan" otomatis disalin saat periode baru dibuat. Tagihan jenis Cicilan/Kredit bisa dihubungkan ke catatan hutang.
+- **Budget harian/mingguan** = total pemasukan − semua tagihan periode itu. Nilainya dibagi ke minggu (per 7 hari sejak tanggal gajian), lalu ke hari. Jatah minggu atau hari bisa diatur manual.
+- **Sisa harian dibawa ke hari berikutnya.** Jatah hari ini bisa diubah langsung dari halaman **Hari ini**.
+- **Saldo** = pemasukan − tagihan yang sudah dibayar − pengeluaran.
 
 ## Struktur folder
 

@@ -27,12 +27,15 @@ test('allocate total tetap sama', () => {
 })
 
 test('computePlan & carry-over', () => {
-  const period = { salary: 6_000_000, start_date: '2026-10-25', end_date: '2026-11-24' }
+  const period = { start_date: '2026-10-25', end_date: '2026-11-24' }
   const plan = computePlan({
     period,
-    fixedItems: [{ amount: 1_500_000 }, { amount: 1_400_000 }],
+    incomes: [{ amount: 5_000_000 }, { amount: 1_000_000 }],
+    bills: [{ amount: 1_500_000, paid: true }, { amount: 1_400_000 }],
     overrides: [{ week_index: 0, amount: 1_000_000 }, { day: '2026-10-25', amount: 400_000 }],
   })
+  assert.equal(plan.income, 6_000_000)
+  assert.equal(plan.billsPaid, 1_500_000)
   assert.equal(plan.flexible, 3_100_000)
   assert.equal(plan.weeks[0].amount, 1_000_000)
   assert.equal(plan.weeks.reduce((s, w) => s + w.amount, 0), 3_100_000)
@@ -46,4 +49,11 @@ test('computePlan & carry-over', () => {
   assert.equal(st['2026-10-26'].carryIn, 50_000)
   assert.equal(st['2026-10-26'].available, 100_000 + 50_000)
   assert.equal(st['2026-10-27'].carryIn, -50_000)
+})
+
+test('addMonths dibatasi akhir bulan', async () => {
+  const { addMonths } = await import('./dates.js')
+  assert.equal(addMonths('2026-01-31', 1), '2026-02-28')
+  assert.equal(addMonths('2026-10-25', 1), '2026-11-25')
+  assert.equal(addMonths('2026-12-10', 1), '2027-01-10')
 })
