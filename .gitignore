@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+.DS_Store
+
+# foto asli (yang dipakai aplikasi ada di public/img)
+privimage/
+
+# screenshot dari Claude (tidak perlu di-upload)
+Claude outputs/

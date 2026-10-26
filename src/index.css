@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fdf6f9;
+  --card: #ffffff;
+  --ink: #2b1d28;
+  --muted: #94808e;
+  --line: #f4e4ed;
+  --soft: #fbeef4;
+  --accent: #c026a5;
+  --accent-soft: #fbe6f6;
+  --accent-2: #f472b6;
+  --danger: #c2410c;
+  --danger-soft: #fdeee6;
+  --hero-from: #fde4f1;
+  --hero-to: #f6e3fd;
+  --shadow: 0 1px 2px rgb(192 38 165 / .04), 0 8px 24px -12px rgb(192 38 165 / .12);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171015;
+    --card: #21171f;
+    --ink: #f7e9f2;
+    --muted: #b49cad;
+    --line: #362631;
+    --soft: #2b1e28;
+    --accent: #f5a3e3;
+    --accent-soft: #3e2039;
+    --accent-2: #f9a8d4;
+    --danger: #fb923c;
+    --danger-soft: #3a2116;
+    --hero-from: #3a1b33;
+    --hero-to: #2c1a3a;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-soft: var(--soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-2: var(--accent-2);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html, body { background: var(--bg); color: var(--ink); }
+body { -webkit-tap-highlight-color: transparent; }
+.tabular { font-variant-numeric: tabular-nums; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+@utility card { @apply bg-card border border-line rounded-3xl; box-shadow: var(--shadow); }
+@utility hero { @apply border border-line rounded-3xl; background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); box-shadow: var(--shadow); }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 h-11 text-sm font-medium transition active:scale-[.98] disabled:opacity-50; }
+@utility btn-primary { @apply btn text-white dark:text-[#2b1d28]; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+@utility btn-ghost { @apply btn bg-soft text-ink; }
+@utility btn-danger { @apply btn bg-danger-soft text-danger; }
+@utility input { @apply w-full h-11 rounded-2xl border border-line bg-card px-3 text-sm outline-none focus:border-accent; }
+@utility label { @apply block text-xs font-medium text-muted mb-1.5; }
+@utility chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 h-9 text-sm transition; }
+
+/* Foto pribadi di kartu utama: memudar ke kiri supaya angka tetap terbaca */
+.hero { position: relative; overflow: hidden; }
+.hero > :not(.hero-photo) { position: relative; }
+.hero-photo {
+  position: absolute; top: 0; right: 0; height: 100%; width: 55%;
+  object-fit: cover; object-position: center 30%; pointer-events: none;
+  opacity: .55;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 75%);
+          mask-image: linear-gradient(to right, transparent 0%, #000 75%);
+}
+@media (min-width: 768px) { .hero-photo { width: 42%; opacity: .9; } }
+@media (prefers-color-scheme: dark) { .hero-photo { opacity: .4; } }
