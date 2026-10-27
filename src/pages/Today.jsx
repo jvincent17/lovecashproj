@@ -101,7 +101,7 @@ export default function Today() {
           </div>
           <div><dt className="text-muted text-xs">Terpakai</dt><dd className="tabular font-medium">{rupiah(s.spent)}</dd></div>
         </dl>
-        <p className="text-[11px] text-muted mt-2">Dana tersedia = jatah + sisa/minus dari hari sebelumnya − terpakai.</p>
+        <p className="text-[11px] text-muted mt-2">Dana tersedia = jatah + sisa dari kemarin − terpakai. Kalau minus, jatah hari berikutnya yang dipotong.</p>
         <div className="grid grid-cols-2 gap-2 mt-5">
           <button onClick={() => setEditJatah(true)} className="btn-ghost bg-card/70"><Pencil size={16} /> Atur jatah</button>
           <button onClick={() => setSheet({ open: true, expense: null })} className="btn-primary"><Plus size={18} /> Catat</button>

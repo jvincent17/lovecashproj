@@ -164,10 +164,10 @@ const SWATCH = {
 }
 
 const CARRY = [
-  { key: 'next', title: 'Bawa penuh ke hari berikutnya',
-    hint: 'Minus hari ini langsung mengurangi dana tersedia besok. Jatah hari-hari lain tidak berubah.' },
+  { key: 'next', title: 'Potong penuh jatah hari berikutnya',
+    hint: 'Seluruh minus hari ini memotong jatah besok (mis. jatah 31rb − minus 13rb = 18rb). Jatah hari-hari lain tidak berubah.' },
   { key: 'spread', title: 'Bagi rata ke sisa hari minggu ini',
-    hint: 'Minus dibagi rata ke hari-hari tersisa di minggu itu, jadi jatah harian ikut menyesuaikan. Kalau sudah hari terakhir minggu, dibawa ke besok.' },
+    hint: 'Minus dibagi rata ke hari-hari tersisa di minggu itu, jadi jatah harian ikut menyesuaikan. Kalau sudah hari terakhir minggu, memotong jatah besok.' },
 ]
 
 function CarryModeCard() {

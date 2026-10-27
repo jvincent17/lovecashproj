@@ -116,16 +116,16 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
 
 /**
  * Hitung status setiap hari.
- * - Sisa (plus) selalu dibawa penuh ke hari berikutnya.
- * - Minus, tergantung mode:
- *   'next'   → dibawa penuh ke hari berikutnya (muncul di "Dari kemarin").
- *   'spread' → dibagi rata ke sisa hari di minggu yang sama (jatah hari-hari itu dikurangi).
- *              Kalau sudah hari terakhir minggu itu, dibawa ke hari berikutnya.
+ * - Sisa (plus) selalu dibawa penuh ke hari berikutnya (muncul di "Dari kemarin").
+ * - Minus mengurangi JATAH hari berikutnya, tergantung mode:
+ *   'next'   → seluruh minus memotong jatah 1 hari berikutnya.
+ *   'spread' → minus dibagi rata ke sisa hari di minggu yang sama.
+ *              Kalau sudah hari terakhir minggu itu, memotong jatah hari berikutnya.
  * spentByDate: { 'YYYY-MM-DD': total }
  */
 export function dailyStatus(plan, spentByDate, start, end, mode = 'next') {
   const out = {}
-  const adj = {} // potongan jatah dari minus hari sebelumnya (mode spread)
+  const adj = {} // potongan jatah dari minus hari sebelumnya
   const weekOf = {}
   for (const w of plan.weeks || []) for (const d of w.days) weekOf[d.date ?? d] = w
   let carry = 0
@@ -139,15 +139,20 @@ export function dailyStatus(plan, spentByDate, start, end, mode = 'next') {
     out[d] = { alloc, baseAlloc, adjust, carryIn: carry, available, spent, remaining }
 
     carry = remaining
-    if (mode === 'spread' && remaining < 0) {
-      const w = weekOf[d]
-      const later = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
-      if (later.length) {
+    if (remaining < 0) {
+      const deficit = -remaining
+      const tomorrow = addDays(d, 1)
+      let targets = []
+      if (mode === 'spread') {
+        const w = weekOf[d]
+        targets = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
+      }
+      if (!targets.length && tomorrow <= end) targets = [tomorrow]
+      if (targets.length) {
         // bagi rata; sisa pembulatan ke hari-hari pertama
-        const deficit = -remaining
-        const base = Math.floor(deficit / later.length)
-        let extra = deficit - base * later.length
-        for (const x of later) {
+        const base = Math.floor(deficit / targets.length)
+        let extra = deficit - base * targets.length
+        for (const x of targets) {
           const cut = base + (extra > 0 ? 1 : 0)
           if (extra > 0) extra--
           adj[x] = (adj[x] || 0) - cut
