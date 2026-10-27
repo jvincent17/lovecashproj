@@ -115,20 +115,19 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
 }
 
 /**
- * Hitung status setiap hari.
- * - Sisa (plus) selalu dibawa penuh ke hari berikutnya (muncul di "Dari kemarin").
- * - Minus mengurangi JATAH hari berikutnya, tergantung mode:
- *   'next'   → seluruh minus memotong jatah 1 hari berikutnya.
- *   'spread' → minus dibagi rata ke sisa hari di minggu yang sama.
- *              Kalau sudah hari terakhir minggu itu, memotong jatah hari berikutnya.
+ * Hitung status setiap hari. Sisa (plus) maupun minus dipindahkan ke JATAH hari berikutnya:
+ *   'next'   → seluruhnya ke jatah 1 hari berikutnya.
+ *   'spread' → dibagi rata ke sisa hari di minggu yang sama
+ *              (kalau sudah hari terakhir minggu itu, ke jatah hari berikutnya).
+ * minusMode untuk hari yang minus, plusMode untuk hari yang bersisa.
  * spentByDate: { 'YYYY-MM-DD': total }
  */
-export function dailyStatus(plan, spentByDate, start, end, mode = 'next') {
+export function dailyStatus(plan, spentByDate, start, end, minusMode = 'next', plusMode = 'next') {
   const out = {}
-  const adj = {} // potongan jatah dari minus hari sebelumnya
+  const adj = {} // penyesuaian jatah dari sisa/minus hari sebelumnya
   const weekOf = {}
   for (const w of plan.weeks || []) for (const d of w.days) weekOf[d.date ?? d] = w
-  let carry = 0
+  let carry = 0 // hanya terpakai kalau tidak ada hari berikutnya (akhir periode)
   for (let d = start; d <= end; d = addDays(d, 1)) {
     const baseAlloc = plan.dayAlloc[d] || 0
     const adjust = adj[d] || 0
@@ -139,27 +138,27 @@ export function dailyStatus(plan, spentByDate, start, end, mode = 'next') {
     out[d] = { alloc, baseAlloc, adjust, carryIn: carry, available, spent, remaining }
 
     carry = remaining
-    if (remaining < 0) {
-      const deficit = -remaining
-      const tomorrow = addDays(d, 1)
-      let targets = []
-      if (mode === 'spread') {
-        const w = weekOf[d]
-        targets = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
-      }
-      if (!targets.length && tomorrow <= end) targets = [tomorrow]
-      if (targets.length) {
-        // bagi rata; sisa pembulatan ke hari-hari pertama
-        const base = Math.floor(deficit / targets.length)
-        let extra = deficit - base * targets.length
-        for (const x of targets) {
-          const cut = base + (extra > 0 ? 1 : 0)
-          if (extra > 0) extra--
-          adj[x] = (adj[x] || 0) - cut
-        }
-        carry = 0
-      }
+    if (remaining === 0) continue
+    const mode = remaining < 0 ? minusMode : plusMode
+    const tomorrow = addDays(d, 1)
+    let targets = []
+    if (mode === 'spread') {
+      const w = weekOf[d]
+      targets = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
     }
+    if (!targets.length && tomorrow <= end) targets = [tomorrow]
+    if (!targets.length) continue
+    // bagi rata; sisa pembulatan ke hari-hari pertama
+    const sign = remaining < 0 ? -1 : 1
+    const total = Math.abs(remaining)
+    const base = Math.floor(total / targets.length)
+    let extra = total - base * targets.length
+    for (const x of targets) {
+      const part = base + (extra > 0 ? 1 : 0)
+      if (extra > 0) extra--
+      adj[x] = (adj[x] || 0) + sign * part
+    }
+    carry = 0
   }
   return out
 }

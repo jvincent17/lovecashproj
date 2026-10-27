@@ -163,26 +163,25 @@ const SWATCH = {
   blue: { light: ['#e2edfd', '#8fb6f7', '#4470d4'], dark: ['#1a2a47', '#c4d7ff', '#9dc1ff'] },
 }
 
-const CARRY = [
-  { key: 'next', title: 'Potong penuh jatah hari berikutnya',
-    hint: 'Seluruh minus hari ini memotong jatah besok (mis. jatah 31rb − minus 13rb = 18rb). Jatah hari-hari lain tidak berubah.' },
-  { key: 'spread', title: 'Bagi rata ke sisa hari minggu ini',
-    hint: 'Minus dibagi rata ke hari-hari tersisa di minggu itu, jadi jatah harian ikut menyesuaikan. Kalau sudah hari terakhir minggu, memotong jatah besok.' },
+const MODES_MINUS = [
+  { key: 'next', title: 'Potong penuh jatah besok', hint: 'mis. jatah 31rb − minus 13rb = jatah besok 18rb' },
+  { key: 'spread', title: 'Bagi rata ke sisa hari minggu ini', hint: 'potongan kecil di setiap hari tersisa' },
+]
+const MODES_PLUS = [
+  { key: 'next', title: 'Tambah penuh ke jatah besok', hint: 'mis. sisa 20rb → jatah besok 31rb + 20rb = 51rb' },
+  { key: 'spread', title: 'Bagi rata ke sisa hari minggu ini', hint: 'tambahan kecil di setiap hari tersisa' },
 ]
 
-function CarryModeCard() {
+function ModeGroup({ title, field, options }) {
   const { cashflow, updateCashflow } = useData()
-  const mode = cashflow?.carry_mode || 'next'
+  const mode = cashflow?.[field] || 'next'
   return (
-    <section className="card p-5 space-y-3">
-      <div>
-        <h2 className="font-semibold">Kalau pengeluaran harian minus</h2>
-        <p className="text-xs text-muted mt-0.5">Berlaku untuk semua anggota cashflow. Sisa (plus) selalu dibawa ke hari berikutnya.</p>
-      </div>
+    <div>
+      <p className="label">{title}</p>
       <div className="grid gap-2">
-        {CARRY.map((c) => (
-          <button key={c.key} onClick={() => mode !== c.key && updateCashflow({ carry_mode: c.key })}
-            className={`text-left rounded-2xl border p-3.5 flex gap-3 transition ${mode === c.key ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent'}`}>
+        {options.map((c) => (
+          <button key={c.key} onClick={() => mode !== c.key && updateCashflow({ [field]: c.key })}
+            className={`text-left rounded-2xl border p-3 flex gap-3 transition ${mode === c.key ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent'}`}>
             <span className={`mt-0.5 size-4 rounded-full border-2 shrink-0 ${mode === c.key ? 'border-accent bg-accent' : 'border-line'}`} />
             <span>
               <span className="block text-sm font-medium">{c.title}</span>
@@ -191,6 +190,22 @@ function CarryModeCard() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+function CarryModeCard() {
+  return (
+    <section className="card p-5 space-y-4">
+      <div>
+        <h2 className="font-semibold">Sisa & minus jatah harian</h2>
+        <p className="text-xs text-muted mt-0.5">
+          Uang yang tersisa atau kurang di suatu hari dipindahkan ke jatah hari berikutnya. Kalau sudah hari terakhir minggu,
+          masuk ke jatah besok. Berlaku untuk semua anggota cashflow.
+        </p>
+      </div>
+      <ModeGroup title="Kalau ada sisa (lebih)" field="surplus_mode" options={MODES_PLUS} />
+      <ModeGroup title="Kalau minus" field="carry_mode" options={MODES_MINUS} />
     </section>
   )
 }

@@ -86,22 +86,23 @@ export default function Today() {
         <p className="text-xs text-muted mt-1 money">
           {s.spent > 0 ? `sisa dari jatah ${rupiah(s.alloc)} · terpakai ${rupiah(s.spent)}` : 'belum ada pengeluaran'}
           {s.adjust < 0 && <span className="block text-danger">jatah dipotong {rupiah(-s.adjust)} dari minus hari sebelumnya</span>}
+          {s.adjust > 0 && <span className="block text-accent">jatah ditambah {rupiah(s.adjust)} dari sisa hari sebelumnya</span>}
         </p>
         <Bar value={s.spent} max={Math.max(0, s.alloc)} className="mt-4" />
         <dl className="grid grid-cols-3 gap-2 mt-4 text-sm">
           <div>
-            <dt className="text-muted text-xs">Dana tersedia</dt>
-            <dd className={`tabular font-medium ${s.remaining < 0 ? 'text-danger' : ''}`}>{rupiah(s.remaining)}</dd>
+            <dt className="text-muted text-xs">Jatah normal</dt>
+            <dd className="tabular font-medium">{rupiah(s.baseAlloc)}</dd>
           </div>
           <div>
-            <dt className="text-muted text-xs">Dari kemarin</dt>
-            <dd className={`tabular font-medium ${s.carryIn < 0 ? 'text-danger' : s.carryIn > 0 ? 'text-accent' : ''}`}>
-              {s.carryIn > 0 ? '+' : ''}{rupiah(s.carryIn)}
+            <dt className="text-muted text-xs">Sisa/minus lalu</dt>
+            <dd className={`tabular font-medium ${s.adjust + s.carryIn < 0 ? 'text-danger' : s.adjust + s.carryIn > 0 ? 'text-accent' : ''}`}>
+              {s.adjust + s.carryIn > 0 ? '+' : ''}{rupiah(s.adjust + s.carryIn)}
             </dd>
           </div>
           <div><dt className="text-muted text-xs">Terpakai</dt><dd className="tabular font-medium">{rupiah(s.spent)}</dd></div>
         </dl>
-        <p className="text-[11px] text-muted mt-2">Dana tersedia = jatah + sisa dari kemarin − terpakai. Kalau minus, jatah hari berikutnya yang dipotong.</p>
+        <p className="text-[11px] text-muted mt-2">Jatah = jatah normal + sisa/minus hari sebelumnya. Cara pindahnya diatur di Pengaturan.</p>
         <div className="grid grid-cols-2 gap-2 mt-5">
           <button onClick={() => setEditJatah(true)} className="btn-ghost bg-card/70"><Pencil size={16} /> Atur jatah</button>
           <button onClick={() => setSheet({ open: true, expense: null })} className="btn-primary"><Plus size={18} /> Catat</button>

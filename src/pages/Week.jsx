@@ -82,7 +82,7 @@ export default function Week() {
                   </div>
                   <Bar value={s.spent} max={Math.max(0, s.available)} className="mt-2" />
                   <div className="flex justify-between text-xs text-muted mt-1.5 money">
-                    <span>Terpakai {rupiah(s.spent)}{s.adjust < 0 && <span className="text-danger"> · potong {rupiah(-s.adjust)}</span>}</span>
+                    <span>Terpakai {rupiah(s.spent)}{s.adjust < 0 && <span className="text-danger"> · potong {rupiah(-s.adjust)}</span>}{s.adjust > 0 && <span className="text-accent"> · +{rupiah(s.adjust)} dari sisa</span>}</span>
                     <span>{s.carryIn !== 0 && `${s.carryIn > 0 ? '+' : ''}${rupiah(s.carryIn)} dari kemarin`}</span>
                   </div>
                 </div>
