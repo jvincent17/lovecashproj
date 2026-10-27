@@ -68,7 +68,7 @@ export default function Week() {
           return (
             <button key={d.date} onClick={() => setDay(d)} className="w-full text-left px-5 py-4 hover:bg-soft/50">
               <div className="flex items-center gap-3">
-                <div className={`w-12 shrink-0 text-center rounded-xl py-1.5 ${isToday ? 'bg-gradient-to-br from-accent to-accent-2 text-white dark:text-[#2b1d28]' : 'bg-soft'}`}>
+                <div className={`w-12 shrink-0 text-center rounded-xl py-1.5 ${isToday ? 'bg-gradient-to-br from-accent to-accent-2 text-on-accent' : 'bg-soft'}`}>
                   <div className="text-[11px] leading-none opacity-80">{fmtDay(d.date)}</div>
                   <div className="font-semibold leading-tight">{fmtShort(d.date).split(' ')[0]}</div>
                 </div>

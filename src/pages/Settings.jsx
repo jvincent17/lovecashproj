@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Copy, LogOut, Plus, RefreshCw, Trash2, Users } from 'lucide-react'
+import { Camera, Check, Copy, LogOut, Moon, Palette, Plus, RefreshCw, Sun, Trash2, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useData } from '../context/DataContext.jsx'
 import Sheet from '../components/Sheet.jsx'
 import Avatar from '../components/Avatar.jsx'
 import CouplePhoto from '../components/CouplePhoto.jsx'
+import { MODES, PALETTES, useTheme } from '../lib/theme.js'
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -23,6 +24,8 @@ export default function Settings() {
       <h1 className="text-xl font-semibold">Pengaturan</h1>
 
       <ProfileCard profile={profile} email={user?.email} onSave={updateProfile} />
+
+      <ThemeCard />
 
       {/* Cashflow bersama */}
       <section className="card p-5 space-y-4">
@@ -117,6 +120,54 @@ export default function Settings() {
       <CategorySheet open={cat.open} item={cat.item} onClose={() => setCat({ open: false, item: null })} />
       <JoinSheet open={joinOpen} onClose={() => setJoinOpen(false)} onJoin={joinCashflow} />
     </div>
+  )
+}
+
+const SWATCH = {
+  pink: { light: ['#fde4f1', '#f472b6', '#c026a5'], dark: ['#3a1b33', '#f9a8d4', '#f5a3e3'] },
+  blue: { light: ['#e2edfd', '#8fb6f7', '#4470d4'], dark: ['#1a2a47', '#c4d7ff', '#9dc1ff'] },
+}
+
+function ThemeCard() {
+  const [theme, setTheme] = useTheme()
+  return (
+    <section className="card p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Palette size={18} className="text-accent" />
+        <h2 className="font-semibold">Tampilan</h2>
+      </div>
+      <div>
+        <p className="label">Warna</p>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(PALETTES).map(([key, label]) => {
+            const active = theme.palette === key
+            const [a, b, c] = SWATCH[key][theme.mode]
+            return (
+              <button key={key} onClick={() => setTheme({ palette: key })}
+                className={`relative rounded-2xl border p-3 text-left transition ${active ? 'border-accent ring-2 ring-accent-soft' : 'border-line hover:border-accent'}`}>
+                <span className="flex gap-1.5">
+                  {[a, b, c].map((col) => <span key={col} className="size-6 rounded-full border border-black/5" style={{ background: col }} />)}
+                </span>
+                <span className="block text-sm font-medium mt-2">{label}</span>
+                {active && <Check size={16} className="absolute top-3 right-3 text-accent" />}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="label">Mode</p>
+        <div className="grid grid-cols-2 gap-1 p-1 bg-soft rounded-xl">
+          {Object.entries(MODES).map(([key, label]) => (
+            <button key={key} onClick={() => setTheme({ mode: key })}
+              className={`h-10 rounded-lg text-sm inline-flex items-center justify-center gap-2 ${theme.mode === key ? 'bg-card shadow-sm font-medium' : 'text-muted'}`}>
+              {key === 'light' ? <Sun size={16} /> : <Moon size={16} />} {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-muted">Tersimpan di perangkat ini, tidak mengikuti setelan browser.</p>
+    </section>
   )
 }
 

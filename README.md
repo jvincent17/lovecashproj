@@ -77,6 +77,7 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 - **Budget harian/mingguan** = dana bulan ini − semua tagihan periode itu. Nilainya dibagi ke minggu (per 7 hari sejak tanggal gajian), lalu ke hari. Jatah minggu atau hari bisa diatur manual.
 - **Sisa harian dibawa ke hari berikutnya.** Jatah hari ini bisa diubah langsung dari halaman **Hari ini**.
 - **Saldo** = dana bulan ini − tagihan yang sudah dibayar − pengeluaran.
+- **Lokasi dana** (GoPay, Cash, BCA, dll.) bisa ditambah bebas, dengan emoji atau logo sendiri. Dana masuk, pengeluaran, dan tagihan dibayar masing-masing bisa memilih lokasi. Yang tidak dipilih masuk ke **Unlocated Money**. Gunakan **Pindah dana** untuk memindahkan uang antarlokasi. Saldo tiap lokasi dihitung otomatis sepanjang waktu. Menghapus lokasi mengembalikan saldo dan transaksinya ke Unlocated Money.
 
 ## Struktur folder
 

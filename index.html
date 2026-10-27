@@ -11,6 +11,17 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <title>Duit Kara</title>
+    <script>
+      // Terapkan tema sebelum halaman tampil supaya tidak berkedip
+      try {
+        var t = JSON.parse(localStorage.getItem('duitkara-theme') || '{}')
+        document.documentElement.dataset.palette = t.palette === 'blue' ? 'blue' : 'pink'
+        document.documentElement.dataset.mode = t.mode === 'dark' ? 'dark' : 'light'
+      } catch (e) {
+        document.documentElement.dataset.palette = 'pink'
+        document.documentElement.dataset.mode = 'light'
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

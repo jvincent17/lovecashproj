@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-:root {
+:root,
+:root[data-palette="pink"] {
+  /* Pink · terang (default) */
   --bg: #fdf6f9;
   --card: #ffffff;
   --ink: #2b1d28;
@@ -10,6 +12,7 @@
   --accent: #c026a5;
   --accent-soft: #fbe6f6;
   --accent-2: #f472b6;
+  --on-accent: #ffffff;
   --danger: #c2410c;
   --danger-soft: #fdeee6;
   --hero-from: #fde4f1;
@@ -18,25 +21,66 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #171015;
-    --card: #21171f;
-    --ink: #f7e9f2;
-    --muted: #b49cad;
-    --line: #362631;
-    --soft: #2b1e28;
-    --accent: #f5a3e3;
-    --accent-soft: #3e2039;
-    --accent-2: #f9a8d4;
-    --danger: #fb923c;
-    --danger-soft: #3a2116;
-    --hero-from: #3a1b33;
-    --hero-to: #2c1a3a;
-    --shadow: none;
-    color-scheme: dark;
-  }
+:root[data-palette="pink"][data-mode="dark"],
+:root:not([data-palette])[data-mode="dark"] {
+  --bg: #171015;
+  --card: #21171f;
+  --ink: #f7e9f2;
+  --muted: #b49cad;
+  --line: #362631;
+  --soft: #2b1e28;
+  --accent: #f5a3e3;
+  --accent-soft: #3e2039;
+  --accent-2: #f9a8d4;
+  --on-accent: #2b1d28;
+  --danger: #fb923c;
+  --danger-soft: #3a2116;
+  --hero-from: #3a1b33;
+  --hero-to: #2c1a3a;
+  --shadow: none;
+  color-scheme: dark;
 }
+
+:root[data-palette="blue"] {
+  /* Biru pastel · terang — sejuk, dengan sentuhan lavender supaya selembut tema pink */
+  --bg: #f5f8fd;
+  --card: #ffffff;
+  --ink: #1e2536;
+  --muted: #7f8aa0;
+  --line: #e3eaf6;
+  --soft: #edf2fb;
+  --accent: #4470d4;
+  --accent-soft: #e5edfd;
+  --accent-2: #8fb6f7;
+  --on-accent: #ffffff;
+  --danger: #c2410c;
+  --danger-soft: #fdeee6;
+  --hero-from: #e2edfd;
+  --hero-to: #ebe7fc;
+  --shadow: 0 1px 2px rgb(68 112 212 / .04), 0 8px 24px -12px rgb(68 112 212 / .14);
+  color-scheme: light;
+}
+
+:root[data-palette="blue"][data-mode="dark"] {
+  --bg: #10141c;
+  --card: #171d29;
+  --ink: #e8eef9;
+  --muted: #9aa6bc;
+  --line: #263043;
+  --soft: #1d2534;
+  --accent: #9dc1ff;
+  --accent-soft: #1d2b46;
+  --accent-2: #c4d7ff;
+  --on-accent: #1e2536;
+  --danger: #fb923c;
+  --danger-soft: #3a2116;
+  --hero-from: #1a2a47;
+  --hero-to: #251f3f;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 @theme inline {
   --color-bg: var(--bg);
@@ -48,12 +92,13 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-2: var(--accent-2);
+  --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-html, body { background: var(--bg); color: var(--ink); }
+html, body { background: var(--bg); color: var(--ink); transition: background-color .2s ease; }
 body { -webkit-tap-highlight-color: transparent; }
 .tabular { font-variant-numeric: tabular-nums; }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
@@ -61,7 +106,7 @@ body { -webkit-tap-highlight-color: transparent; }
 @utility card { @apply bg-card border border-line rounded-3xl; box-shadow: var(--shadow); }
 @utility hero { @apply border border-line rounded-3xl; background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); box-shadow: var(--shadow); }
 @utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 h-11 text-sm font-medium transition active:scale-[.98] disabled:opacity-50; }
-@utility btn-primary { @apply btn text-white dark:text-[#2b1d28]; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+@utility btn-primary { @apply btn text-on-accent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
 @utility btn-ghost { @apply btn bg-soft text-ink; }
 @utility btn-danger { @apply btn bg-danger-soft text-danger; }
 @utility input { @apply w-full h-11 rounded-2xl border border-line bg-card px-3 text-sm outline-none focus:border-accent; }
@@ -79,4 +124,4 @@ body { -webkit-tap-highlight-color: transparent; }
           mask-image: linear-gradient(to right, transparent 0%, #000 75%);
 }
 @media (min-width: 768px) { .hero-photo { width: 42%; opacity: .9; } }
-@media (prefers-color-scheme: dark) { .hero-photo { opacity: .4; } }
+:root[data-mode="dark"] .hero-photo { opacity: .4; }

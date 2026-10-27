@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Sun, CalendarDays, Wallet, HandCoins, Settings as Cog, X } from 'lucide-react'
+import { Sun, CalendarDays, Wallet, HandCoins, PiggyBank, Settings as Cog, X } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { greeting } from '../lib/photos.js'
 import Avatar from './Avatar.jsx'
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/', label: 'Hari ini', icon: Sun, end: true },
   { to: '/minggu', label: 'Minggu', icon: CalendarDays },
   { to: '/bulan', label: 'Bulan', icon: Wallet },
+  { to: '/lokasi', label: 'Lokasi', icon: PiggyBank },
   { to: '/hutang', label: 'Hutang', icon: HandCoins },
 ]
 
@@ -79,7 +80,7 @@ export default function Layout() {
 
       {/* Bottom nav mobile */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t border-line safe-bottom z-30">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) =>

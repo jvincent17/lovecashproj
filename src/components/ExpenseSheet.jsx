@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
 import AmountInput from './AmountInput.jsx'
 import { useData } from '../context/DataContext.jsx'
+import WalletPicker from './WalletPicker.jsx'
+
+const LAST = 'duitkara-last-wallet'
+const lastWallet = () => { try { return localStorage.getItem(LAST) || null } catch { return null } }
 
 /** Form tambah/edit pengeluaran. `expense` = null untuk tambah baru. */
 export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
-  const { categories, saveExpense, deleteExpense, today } = useData()
+  const { categories, saveExpense, deleteExpense, today, walletById } = useData()
   const [amount, setAmount] = useState(0)
   const [categoryId, setCategoryId] = useState(null)
+  const [walletId, setWalletId] = useState(null)
   const [note, setNote] = useState('')
   const [date, setDate] = useState(today)
   const [busy, setBusy] = useState(false)
@@ -17,6 +22,7 @@ export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
     setAmount(expense ? Number(expense.amount) : 0)
     setCategoryId(expense?.category_id ?? categories[0]?.id ?? null)
     setNote(expense?.note ?? '')
+    setWalletId(expense ? expense.wallet_id : (walletById[lastWallet()] ? lastWallet() : null))
     setDate(expense?.date ?? defaultDate ?? today)
   }, [open, expense, defaultDate, today, categories])
 
@@ -25,7 +31,8 @@ export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
     if (!amount) return
     setBusy(true)
     try {
-      await saveExpense({ id: expense?.id, amount, category_id: categoryId, note: note.trim() || null, date })
+      await saveExpense({ id: expense?.id, amount, category_id: categoryId, wallet_id: walletId, note: note.trim() || null, date })
+      try { walletId ? localStorage.setItem(LAST, walletId) : localStorage.removeItem(LAST) } catch { /* */ }
       onClose()
     } catch { /* error tampil di banner */ } finally { setBusy(false) }
   }
@@ -51,6 +58,8 @@ export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
             ))}
           </div>
         </div>
+
+        <WalletPicker label="Bayar dari" value={walletId} onChange={setWalletId} />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="col-span-2 sm:col-span-1">

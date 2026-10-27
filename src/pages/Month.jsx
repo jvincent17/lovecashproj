@@ -7,6 +7,7 @@ import Sheet from '../components/Sheet.jsx'
 import AmountInput from '../components/AmountInput.jsx'
 import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
 import Bar from '../components/Bar.jsx'
+import WalletPicker from '../components/WalletPicker.jsx'
 
 const KIND = {
   bill: { label: 'Tagihan', cls: 'bg-soft text-muted' },
@@ -184,7 +185,7 @@ function BillRow({ b, onEdit }) {
   return (
     <li className="flex items-center gap-3 py-3">
       <button onClick={() => toggleBillPaid(b)} aria-label="Tandai sudah dibayar"
-        className={`size-6 shrink-0 rounded-lg border grid place-items-center ${b.paid ? 'bg-accent border-accent text-white dark:text-[#2b1d28]' : 'border-line'}`}>
+        className={`size-6 shrink-0 rounded-lg border grid place-items-center ${b.paid ? 'bg-accent border-accent text-on-accent' : 'border-line'}`}>
         {b.paid && <Check size={14} />}
       </button>
       <button onClick={onEdit} className="flex-1 min-w-0 text-left">
@@ -251,6 +252,7 @@ export function IncomeSheet({ open, item, onClose }) {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState(0)
   const [date, setDate] = useState(today)
+  const [walletId, setWalletId] = useState(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -259,12 +261,13 @@ export function IncomeSheet({ open, item, onClose }) {
     setAmount(item ? Number(item.amount) : 0)
     const d = item?.date ?? today
     setDate(d < period.start_date || d > period.end_date ? period.start_date : d)
+    setWalletId(item?.wallet_id ?? null)
   }, [open, item, today, period])
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
-    try { await saveIncome({ id: item?.id, name: name.trim(), amount, date }); onClose() } catch { /* */ } finally { setBusy(false) }
+    try { await saveIncome({ id: item?.id, name: name.trim(), amount, date, wallet_id: walletId }); onClose() } catch { /* */ } finally { setBusy(false) }
   }
   const remove = async () => {
     setBusy(true)
@@ -278,6 +281,7 @@ export function IncomeSheet({ open, item, onClose }) {
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="cth. Gaji, Bonus, Dana tambahan" />
         </label>
         <div><span className="label">Nominal</span><AmountInput big value={amount} onChange={setAmount} /></div>
+        <WalletPicker label="Masuk ke" value={walletId} onChange={setWalletId} />
         <label className="block"><span className="label">Tanggal masuk</span>
           <input type="date" className="input" value={date} min={period.start_date} max={period.end_date} onChange={(e) => setDate(e.target.value)} required />
         
@@ -301,6 +305,7 @@ function BillSheet({ open, item, defaultDue, onClose }) {
   const [debtId, setDebtId] = useState('')
   const [recurring, setRecurring] = useState(false)
   const [note, setNote] = useState('')
+  const [walletId, setWalletId] = useState(null)
   const [busy, setBusy] = useState(false)
   const payable = debts.filter((d) => d.type === 'payable' && (!d.done || d.id === item?.debt_id))
 
@@ -313,6 +318,7 @@ function BillSheet({ open, item, defaultDue, onClose }) {
     setDebtId(item?.debt_id ?? '')
     setRecurring(item?.recurring ?? false)
     setNote(item?.note ?? '')
+    setWalletId(item?.wallet_id ?? null)
   }, [open, item, defaultDue, period])
 
   const pickDebt = (id) => {
@@ -326,7 +332,7 @@ function BillSheet({ open, item, defaultDue, onClose }) {
     setBusy(true)
     const payload = {
       id: item?.id, name: name.trim(), amount, due_date: due, kind, recurring,
-      note: note.trim() || null, debt_id: kind === 'debt' && debtId ? debtId : null,
+      note: note.trim() || null, debt_id: kind === 'debt' && debtId ? debtId : null, wallet_id: walletId,
     }
     try { await saveBill(payload); onClose() } catch { /* */ } finally { setBusy(false) }
   }
@@ -363,6 +369,7 @@ function BillSheet({ open, item, defaultDue, onClose }) {
             <span className="block text-xs text-muted mt-1.5">Saat dicentang, otomatis tercatat sebagai pembayaran hutang tersebut.</span>
           </label>
         )}
+        <WalletPicker label="Dibayar dari" value={walletId} onChange={setWalletId} />
         <label className="block"><span className="label">Catatan (opsional)</span>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="cth. no. kartu, rekening tujuan" />
         </label>

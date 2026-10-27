@@ -129,7 +129,7 @@ export default function Today() {
 
       {/* Tombol mengambang di mobile */}
       <button onClick={() => setSheet({ open: true, expense: null })}
-        className="md:hidden fixed right-4 bottom-20 z-40 size-14 rounded-2xl bg-gradient-to-br from-accent to-accent-2 text-white dark:text-[#2b1d28] shadow-lg grid place-items-center"
+        className="md:hidden fixed right-4 bottom-20 z-40 size-14 rounded-2xl bg-gradient-to-br from-accent to-accent-2 text-on-accent shadow-lg grid place-items-center"
         aria-label="Catat pengeluaran">
         <Plus size={26} />
       </button>

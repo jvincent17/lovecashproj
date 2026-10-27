@@ -26,6 +26,9 @@ export function DataProvider({ children }) {
   const [categories, setCategories] = useState([])
   const [periods, setPeriods] = useState([])
   const [debts, setDebts] = useState([])
+  const [wallets, setWallets] = useState([])
+  const [balances, setBalances] = useState({}) // wallet_id ('' = Unlocated) -> saldo
+  const [transfers, setTransfers] = useState([])
   const [payments, setPayments] = useState([])
 
   const [selectedId, setSelectedId] = useState(null)
@@ -72,6 +75,18 @@ export function DataProvider({ children }) {
     return rows
   }, [])
 
+  const loadWallets = useCallback(async (cf) => {
+    const [w, b, t] = await Promise.all([
+      supabase.from('wallets').select('*').eq('cashflow_id', cf).order('sort').order('created_at'),
+      supabase.rpc('wallet_balances', { cf }),
+      supabase.from('wallet_transfers').select('*').eq('cashflow_id', cf)
+        .order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200),
+    ])
+    setWallets(must(w))
+    setBalances(Object.fromEntries(must(b).map((r) => [r.wallet_id ?? '', Number(r.balance)])))
+    setTransfers(must(t))
+  }, [])
+
   const loadDebts = useCallback(async (cf) => {
     const [d, p] = await Promise.all([
       supabase.from('debts').select('*').eq('cashflow_id', cf).order('created_at', { ascending: false }),
@@ -100,14 +115,14 @@ export function DataProvider({ children }) {
 
   /** Muat semua data untuk cashflow aktif. */
   const loadAll = useCallback(async (cf) => {
-    await Promise.all([loadCashflowMeta(cf), loadCategories(cf), loadDebts(cf)])
+    await Promise.all([loadCashflowMeta(cf), loadCategories(cf), loadDebts(cf), loadWallets(cf)])
     const ps = await loadPeriods(cf)
     setSelectedId((prev) => {
       if (prev && ps.some((p) => p.id === prev)) return prev
       const current = ps.find((p) => p.start_date <= today && p.end_date >= today)
       return (current || ps[0])?.id ?? null
     })
-  }, [loadCashflowMeta, loadCategories, loadDebts, loadPeriods, today])
+  }, [loadCashflowMeta, loadCategories, loadDebts, loadWallets, loadPeriods, today])
 
   // initial load
   useEffect(() => {
@@ -148,7 +163,11 @@ export function DataProvider({ children }) {
     }
   }, [])
 
-  const reloadPeriod = useCallback(() => loadPeriodData(period, nextRange), [loadPeriodData, period, nextRange])
+  // Setiap perubahan uang juga memperbarui saldo lokasi dana
+  const reloadPeriod = useCallback(
+    () => Promise.all([loadPeriodData(period, nextRange), period ? loadWallets(period.cashflow_id) : null]),
+    [loadPeriodData, loadWallets, period, nextRange],
+  )
 
   // ---------- actions ----------
   const actions = useMemo(() => {
@@ -174,7 +193,7 @@ export function DataProvider({ children }) {
           let due = addMonths(b.due_date, 1)
           if (due < created.start_date) due = created.start_date
           if (due > created.end_date) due = created.end_date
-          return withCf({ name: b.name, amount: b.amount, kind: b.kind, debt_id: b.debt_id, recurring: true, note: b.note, due_date: due })
+          return withCf({ name: b.name, amount: b.amount, kind: b.kind, debt_id: b.debt_id, wallet_id: b.wallet_id, recurring: true, note: b.note, due_date: due })
         })
       if (rows.length) must(await supabase.from('bills').insert(rows))
     }
@@ -362,9 +381,35 @@ export function DataProvider({ children }) {
         must(await supabase.from('debt_payments').delete().eq('id', id))
         await Promise.all([loadDebts(cfId), reloadPeriod()])
       }),
+
+      // ----- lokasi dana -----
+      saveWallet: ({ id, iconFile, removeIcon, ...rest }, current) => run(async () => {
+        const patch = { ...rest }
+        if (iconFile) patch.icon_path = await uploadPhoto(`cf/${cfId}`, 'wallet', iconFile, 256)
+        if (removeIcon) patch.icon_path = null
+        if (id) must(await supabase.from('wallets').update(patch).eq('id', id))
+        else must(await supabase.from('wallets').insert(withCf({ ...patch, sort: wallets.length })))
+        if ((iconFile || removeIcon) && current?.icon_path) await removePhoto(current.icon_path)
+        await loadWallets(cfId)
+      }),
+      deleteWallet: (w) => run(async () => {
+        must(await supabase.from('wallets').delete().eq('id', w.id))
+        if (w.icon_path) await removePhoto(w.icon_path)
+        await Promise.all([loadWallets(cfId), reloadPeriod()])
+      }),
+      saveTransfer: (t) => run(async () => {
+        const { id, ...rest } = t
+        if (id) must(await supabase.from('wallet_transfers').update(rest).eq('id', id))
+        else must(await supabase.from('wallet_transfers').insert(withCf(rest)))
+        await loadWallets(cfId)
+      }),
+      deleteTransfer: (id) => run(async () => {
+        must(await supabase.from('wallet_transfers').delete().eq('id', id))
+        await loadWallets(cfId)
+      }),
     }
-  }, [cfId, user.id, profile, cashflow, run, periods, period, today, categories.length,
-      loadAll, loadCashflowMeta, loadPeriods, loadDebts, loadCategories, reloadPeriod])
+  }, [cfId, user.id, profile, cashflow, run, periods, period, today, categories.length, wallets.length,
+      loadAll, loadCashflowMeta, loadPeriods, loadDebts, loadCategories, loadWallets, reloadPeriod])
 
   // ---------- turunan ----------
   const billsThis = useMemo(
@@ -402,6 +447,9 @@ export function DataProvider({ children }) {
     })
   }, [debts, payments])
 
+  const walletById = useMemo(() => Object.fromEntries(wallets.map((w) => [w.id, w])), [wallets])
+  const totalMoney = useMemo(() => Object.values(balances).reduce((a, b) => a + b, 0), [balances])
+
   const value = {
     ready, error, today, user,
     profile, cashflow, myCashflows, members, memberName, payday,
@@ -409,6 +457,7 @@ export function DataProvider({ children }) {
     incomes, bills, billsThis, billsNext, overrides, expenses,
     plan, status, spentByDate, spentTotal, saldo,
     debts: debtsView,
+    wallets, walletById, balances, transfers, totalMoney,
     ...actions,
   }
 
