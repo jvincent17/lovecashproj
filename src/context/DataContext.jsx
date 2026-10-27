@@ -629,8 +629,8 @@ export function DataProvider({ children }) {
   )
   const spentByDate = useMemo(() => sumBy(expenses, (e) => e.date), [expenses])
   const status = useMemo(
-    () => (plan ? dailyStatus(plan, spentByDate, period.start_date, period.end_date, cashflow?.carry_mode || 'next', cashflow?.surplus_mode || 'next') : {}),
-    [plan, spentByDate, period, cashflow?.carry_mode, cashflow?.surplus_mode],
+    () => (plan ? dailyStatus(plan, spentByDate, period.start_date, period.end_date, today) : {}),
+    [plan, spentByDate, period, today],
   )
   const spentTotal = useMemo(() => expenses.reduce((a, e) => a + Number(e.amount), 0), [expenses])
   /** Saldo = pemasukan − tagihan yang sudah dibayar − pengeluaran */

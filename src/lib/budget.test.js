@@ -46,10 +46,8 @@ test('computePlan & carry-over', () => {
 
   const st = dailyStatus(plan, { '2026-10-25': 350_000, '2026-10-26': 200_000 }, period.start_date, period.end_date)
   assert.equal(st['2026-10-25'].remaining, 50_000)
-  assert.equal(st['2026-10-26'].carryIn, 0)
   assert.equal(st['2026-10-26'].adjust, 50_000) // sisa masuk ke jatah besok
-  assert.equal(st['2026-10-26'].available, 100_000 + 50_000)
-  assert.equal(st['2026-10-27'].carryIn, 0)
+  assert.equal(st['2026-10-26'].alloc, 100_000 + 50_000)
   assert.equal(st['2026-10-27'].adjust, -50_000) // minus memotong jatah besok
 })
 
@@ -87,34 +85,23 @@ test('tagihan dipotong dari pemasukan paling awal', () => {
   assert.equal(Object.values(plan.dayAlloc).reduce((s, v) => s + v, 0), 2_000_000)
 })
 
-test('mode minus: bawa ke besok vs bagi rata ke sisa minggu', () => {
+test('sisa/minus pindah penuh ke jatah besok saja', () => {
   const period = { start_date: '2026-10-25', end_date: '2026-11-24' }
   const plan = computePlan({ period, incomes: [{ amount: 3_100_000, date: '2026-10-25' }] }) // 100rb/hari
-  const spent = { '2026-10-25': 100_000, '2026-10-26': 113_098 } // minus 13.098 di tgl 26
-  const next = dailyStatus(plan, spent, period.start_date, period.end_date, 'next')
-  assert.equal(next['2026-10-27'].carryIn, 0)
-  assert.equal(next['2026-10-27'].adjust, -13_098)
-  assert.equal(next['2026-10-27'].alloc, 100_000 - 13_098)
-  assert.equal(next['2026-10-28'].baseAlloc, 100_000)
-  const spread = dailyStatus(plan, spent, period.start_date, period.end_date, 'spread')
-  // minggu 1 = 25–31 Okt → minus dibagi ke 5 hari tersisa setelah tgl 26 (±2.620/hari)
-  assert.ok([-2619, -2620].includes(spread['2026-10-27'].adjust))
-  assert.equal(spread['2026-10-27'].carryIn, 0)
-  assert.ok(spread['2026-10-27'].alloc < 100_000)
-  // akhir minggu: total sisa sama dengan mode next
-  assert.equal(spread['2026-10-31'].remaining, next['2026-10-31'].remaining)
+  const today = '2026-10-28'
+  const spent = { '2026-10-25': 100_000, '2026-10-26': 113_098, '2026-10-27': 50_000 }
+  const st = dailyStatus(plan, spent, period.start_date, period.end_date, today)
+  assert.equal(st['2026-10-27'].alloc, 100_000 - 13_098) // minus tgl 26 memotong tgl 27
+  assert.equal(st['2026-10-28'].alloc, 100_000 + 36_902) // sisa tgl 27 menambah tgl 28 (hari ini)
+  assert.equal(st['2026-10-29'].alloc, 100_000) // lusa tetap normal
+  assert.equal(st['2026-11-24'].alloc, 100_000) // tidak menumpuk sampai akhir bulan
 })
 
-test('mode sisa (plus): ke besok vs bagi rata', () => {
+test('minus hari ini langsung memotong jatah besok', () => {
   const period = { start_date: '2026-10-25', end_date: '2026-11-24' }
-  const plan = computePlan({ period, incomes: [{ amount: 3_100_000, date: '2026-10-25' }] }) // 100rb/hari
-  const spent = { '2026-10-25': 100_000, '2026-10-26': 40_000 } // sisa 60rb di tgl 26
-  const next = dailyStatus(plan, spent, period.start_date, period.end_date, 'next', 'next')
-  assert.equal(next['2026-10-27'].alloc, 160_000)
-  assert.equal(next['2026-10-28'].alloc, 100_000 + 160_000) // tidak dipakai -> terus maju
-  const spread = dailyStatus(plan, spent, period.start_date, period.end_date, 'next', 'spread')
-  assert.equal(spread['2026-10-27'].alloc, 112_000) // 60rb / 5 hari
-  const week = ['2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']
-  assert.equal(spread['2026-10-31'].remaining, next['2026-10-31'].remaining)
-  assert.ok(week.every((d) => spread[d].alloc >= 112_000))
+  const plan = computePlan({ period, incomes: [{ amount: 3_100_000, date: '2026-10-25' }] })
+  const spent = { '2026-10-25': 100_000, '2026-10-26': 100_000, '2026-10-27': 100_000, '2026-10-28': 120_000 }
+  const st = dailyStatus(plan, spent, period.start_date, period.end_date, '2026-10-28')
+  assert.equal(st['2026-10-29'].alloc, 80_000)
+  assert.equal(st['2026-10-30'].alloc, 100_000)
 })

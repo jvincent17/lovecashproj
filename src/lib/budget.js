@@ -115,51 +115,32 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
 }
 
 /**
- * Hitung status setiap hari. Sisa (plus) maupun minus dipindahkan ke JATAH hari berikutnya:
- *   'next'   → seluruhnya ke jatah 1 hari berikutnya.
- *   'spread' → dibagi rata ke sisa hari di minggu yang sama
- *              (kalau sudah hari terakhir minggu itu, ke jatah hari berikutnya).
- * minusMode untuk hari yang minus, plusMode untuk hari yang bersisa.
+ * Hitung status setiap hari.
+ * Sisa atau minus sebuah hari dipindah PENUH ke jatah 1 hari berikutnya.
+ * - Hanya hari yang sudah lewat (< today) yang menghasilkan sisa, karena hari ini & ke depan
+ *   belum selesai (pengeluarannya belum diketahui). Jadi hari-hari ke depan tetap tampil normal.
+ * - Minus hari ini langsung memotong jatah besok (pengeluaran tidak mungkin berkurang lagi).
  * spentByDate: { 'YYYY-MM-DD': total }
  */
-export function dailyStatus(plan, spentByDate, start, end, minusMode = 'next', plusMode = 'next') {
+export function dailyStatus(plan, spentByDate, start, end, today = null) {
   const out = {}
   const adj = {} // penyesuaian jatah dari sisa/minus hari sebelumnya
-  const weekOf = {}
-  for (const w of plan.weeks || []) for (const d of w.days) weekOf[d.date ?? d] = w
-  let carry = 0 // hanya terpakai kalau tidak ada hari berikutnya (akhir periode)
+  let leftover = 0 // sisa di hari terakhir periode (tidak ada "besok")
   for (let d = start; d <= end; d = addDays(d, 1)) {
     const baseAlloc = plan.dayAlloc[d] || 0
     const adjust = adj[d] || 0
     const alloc = baseAlloc + adjust
-    const available = alloc + carry
     const spent = spentByDate[d] || 0
-    const remaining = available - spent
-    out[d] = { alloc, baseAlloc, adjust, carryIn: carry, available, spent, remaining }
+    const remaining = alloc - spent
+    out[d] = { alloc, baseAlloc, adjust, carryIn: 0, available: alloc, spent, remaining }
 
-    carry = remaining
-    if (remaining === 0) continue
-    const mode = remaining < 0 ? minusMode : plusMode
+    const finished = today == null || d < today
+    const moves = remaining < 0 || (remaining > 0 && finished)
     const tomorrow = addDays(d, 1)
-    let targets = []
-    if (mode === 'spread') {
-      const w = weekOf[d]
-      targets = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
-    }
-    if (!targets.length && tomorrow <= end) targets = [tomorrow]
-    if (!targets.length) continue
-    // bagi rata; sisa pembulatan ke hari-hari pertama
-    const sign = remaining < 0 ? -1 : 1
-    const total = Math.abs(remaining)
-    const base = Math.floor(total / targets.length)
-    let extra = total - base * targets.length
-    for (const x of targets) {
-      const part = base + (extra > 0 ? 1 : 0)
-      if (extra > 0) extra--
-      adj[x] = (adj[x] || 0) + sign * part
-    }
-    carry = 0
+    if (moves && tomorrow <= end) adj[tomorrow] = (adj[tomorrow] || 0) + remaining
+    else leftover = remaining
   }
+  void leftover
   return out
 }
 
