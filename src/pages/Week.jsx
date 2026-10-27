@@ -74,14 +74,15 @@ export default function Week() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between text-sm">
-                    <span>Jatah <span className="tabular font-medium">{rupiah(d.amount)}</span>
+                    <span>Jatah <span className="tabular font-medium">{rupiah(s.alloc)}</span>
                       {d.isCustom && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent-soft text-accent">manual</span>}
+
                     </span>
                     <span className={`tabular font-medium ${s.remaining < 0 ? 'text-danger' : ''}`}>{rupiah(s.remaining)}</span>
                   </div>
                   <Bar value={s.spent} max={Math.max(0, s.available)} className="mt-2" />
                   <div className="flex justify-between text-xs text-muted mt-1.5 money">
-                    <span>Terpakai {rupiah(s.spent)}</span>
+                    <span>Terpakai {rupiah(s.spent)}{s.adjust < 0 && <span className="text-danger"> · potong {rupiah(-s.adjust)}</span>}</span>
                     <span>{s.carryIn !== 0 && `${s.carryIn > 0 ? '+' : ''}${rupiah(s.carryIn)} dari kemarin`}</span>
                   </div>
                 </div>

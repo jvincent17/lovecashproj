@@ -85,6 +85,7 @@ export default function Today() {
         </button>
         <p className="text-xs text-muted mt-1 money">
           {s.spent > 0 ? `sisa dari jatah ${rupiah(s.alloc)} · terpakai ${rupiah(s.spent)}` : 'belum ada pengeluaran'}
+          {s.adjust < 0 && <span className="block text-danger">jatah dipotong {rupiah(-s.adjust)} dari minus hari sebelumnya</span>}
         </p>
         <Bar value={s.spent} max={Math.max(0, s.alloc)} className="mt-4" />
         <dl className="grid grid-cols-3 gap-2 mt-4 text-sm">

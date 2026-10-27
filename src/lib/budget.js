@@ -115,19 +115,46 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
 }
 
 /**
- * Hitung status setiap hari dengan sisa/minus dibawa ke hari berikutnya.
+ * Hitung status setiap hari.
+ * - Sisa (plus) selalu dibawa penuh ke hari berikutnya.
+ * - Minus, tergantung mode:
+ *   'next'   → dibawa penuh ke hari berikutnya (muncul di "Dari kemarin").
+ *   'spread' → dibagi rata ke sisa hari di minggu yang sama (jatah hari-hari itu dikurangi).
+ *              Kalau sudah hari terakhir minggu itu, dibawa ke hari berikutnya.
  * spentByDate: { 'YYYY-MM-DD': total }
  */
-export function dailyStatus(plan, spentByDate, start, end) {
+export function dailyStatus(plan, spentByDate, start, end, mode = 'next') {
   const out = {}
+  const adj = {} // potongan jatah dari minus hari sebelumnya (mode spread)
+  const weekOf = {}
+  for (const w of plan.weeks || []) for (const d of w.days) weekOf[d.date ?? d] = w
   let carry = 0
   for (let d = start; d <= end; d = addDays(d, 1)) {
-    const alloc = plan.dayAlloc[d] || 0
+    const baseAlloc = plan.dayAlloc[d] || 0
+    const adjust = adj[d] || 0
+    const alloc = baseAlloc + adjust
     const available = alloc + carry
     const spent = spentByDate[d] || 0
     const remaining = available - spent
-    out[d] = { alloc, carryIn: carry, available, spent, remaining }
+    out[d] = { alloc, baseAlloc, adjust, carryIn: carry, available, spent, remaining }
+
     carry = remaining
+    if (mode === 'spread' && remaining < 0) {
+      const w = weekOf[d]
+      const later = w ? w.days.map((x) => x.date ?? x).filter((x) => x > d && x <= end) : []
+      if (later.length) {
+        // bagi rata; sisa pembulatan ke hari-hari pertama
+        const deficit = -remaining
+        const base = Math.floor(deficit / later.length)
+        let extra = deficit - base * later.length
+        for (const x of later) {
+          const cut = base + (extra > 0 ? 1 : 0)
+          if (extra > 0) extra--
+          adj[x] = (adj[x] || 0) - cut
+        }
+        carry = 0
+      }
+    }
   }
   return out
 }

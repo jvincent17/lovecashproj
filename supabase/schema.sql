@@ -539,3 +539,11 @@ end $$;
 
 revoke all on function public.app_bootstrap(uuid, date) from public, anon;
 grant execute on function public.app_bootstrap(uuid, date) to authenticated;
+
+
+-- =============================================================
+-- Mode minus (sama dengan migrations/006_mode_minus.sql)
+alter table public.cashflows add column if not exists carry_mode text not null default 'next';
+do $$ begin
+  alter table public.cashflows add constraint cashflows_carry_mode_check check (carry_mode in ('next','spread'));
+exception when duplicate_object then null; end $$;

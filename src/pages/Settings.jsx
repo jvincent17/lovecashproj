@@ -35,6 +35,8 @@ export default function Settings() {
 
       <ThemeCard />
 
+      <CarryModeCard />
+
       {/* Cashflow bersama */}
       <section className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -159,6 +161,38 @@ export default function Settings() {
 const SWATCH = {
   pink: { light: ['#fde4f1', '#f472b6', '#c026a5'], dark: ['#3a1b33', '#f9a8d4', '#f5a3e3'] },
   blue: { light: ['#e2edfd', '#8fb6f7', '#4470d4'], dark: ['#1a2a47', '#c4d7ff', '#9dc1ff'] },
+}
+
+const CARRY = [
+  { key: 'next', title: 'Bawa penuh ke hari berikutnya',
+    hint: 'Minus hari ini langsung mengurangi dana tersedia besok. Jatah hari-hari lain tidak berubah.' },
+  { key: 'spread', title: 'Bagi rata ke sisa hari minggu ini',
+    hint: 'Minus dibagi rata ke hari-hari tersisa di minggu itu, jadi jatah harian ikut menyesuaikan. Kalau sudah hari terakhir minggu, dibawa ke besok.' },
+]
+
+function CarryModeCard() {
+  const { cashflow, updateCashflow } = useData()
+  const mode = cashflow?.carry_mode || 'next'
+  return (
+    <section className="card p-5 space-y-3">
+      <div>
+        <h2 className="font-semibold">Kalau pengeluaran harian minus</h2>
+        <p className="text-xs text-muted mt-0.5">Berlaku untuk semua anggota cashflow. Sisa (plus) selalu dibawa ke hari berikutnya.</p>
+      </div>
+      <div className="grid gap-2">
+        {CARRY.map((c) => (
+          <button key={c.key} onClick={() => mode !== c.key && updateCashflow({ carry_mode: c.key })}
+            className={`text-left rounded-2xl border p-3.5 flex gap-3 transition ${mode === c.key ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent'}`}>
+            <span className={`mt-0.5 size-4 rounded-full border-2 shrink-0 ${mode === c.key ? 'border-accent bg-accent' : 'border-line'}`} />
+            <span>
+              <span className="block text-sm font-medium">{c.title}</span>
+              <span className="block text-xs text-muted mt-0.5">{c.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 function ThemeCard() {
