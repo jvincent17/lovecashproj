@@ -48,18 +48,30 @@ export default function Month() {
       {/* Ringkasan */}
       <section className="hero p-5">
         <img src="/img/hero-month.webp" alt="" className="hero-photo" />
-        <p className="text-sm text-muted">Saldo sekarang</p>
-        <p className={`text-3xl font-semibold tabular ${saldo < 0 ? 'text-danger' : ''}`}>{rupiah(saldo)}</p>
-        <p className="text-xs text-muted mt-0.5">Pemasukan − tagihan dibayar − pengeluaran</p>
+        <div className="grid grid-cols-2 gap-4 max-w-sm">
+          <div>
+            <p className="text-sm text-muted">Dana bulan ini</p>
+            <p className="text-xl md:text-3xl font-semibold tabular whitespace-nowrap">{rupiah(plan.income)}</p>
+            {incomes.length > 1 && (
+              <p className="text-xs text-accent mt-0.5">
+                termasuk +{rupiah(plan.income - Number(incomes[0].amount))} dana tambahan
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-muted">Saldo sekarang</p>
+            <p className={`text-xl md:text-3xl font-semibold tabular whitespace-nowrap ${saldo < 0 ? 'text-danger' : ''}`}>{rupiah(saldo)}</p>
+            <p className="text-xs text-muted mt-0.5">uang yang masih dipegang</p>
+          </div>
+        </div>
         <dl className="mt-5 space-y-2 text-sm max-w-xs">
-          <Row label="Total pemasukan" value={rupiah(plan.income)} />
           <Row label="Tagihan bulan ini" value={`-${rupiah(plan.billsTotal)}`} />
           <Row label="Budget harian/mingguan" value={rupiah(plan.flexible)} bold />
           <Row label="Sudah terpakai" value={rupiah(spentTotal)} />
         </dl>
         <Bar value={spentTotal} max={plan.flexible} className="mt-3 max-w-xs" />
         {plan.billsTotal > plan.income && (
-          <p className="text-xs text-danger mt-3">Tagihan melebihi pemasukan sebesar {rupiah(plan.billsTotal - plan.income)}.</p>
+          <p className="text-xs text-danger mt-3">Tagihan melebihi dana bulan ini sebesar {rupiah(plan.billsTotal - plan.income)}.</p>
         )}
       </section>
 
@@ -67,12 +79,12 @@ export default function Month() {
       <section className="card p-5">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="font-semibold">Pemasukan</h2>
-            <p className="text-xs text-muted">Gaji, bonus, freelance, kiriman, dll.</p>
+            <h2 className="font-semibold">Dana masuk</h2>
+            <p className="text-xs text-muted">Gaji, bonus, kiriman, dll. Dana tambahan menambah jatah mulai tanggal masuknya.</p>
           </div>
           <button onClick={() => setIncome({ open: true, item: null })} className="btn-ghost h-9 px-3"><Plus size={15} /> Tambah</button>
         </div>
-        {incomes.length === 0 && <p className="text-sm text-muted py-4 text-center">Belum ada pemasukan di periode ini.</p>}
+        {incomes.length === 0 && <p className="text-sm text-muted py-4 text-center">Belum ada dana masuk di periode ini.</p>}
         <ul className="divide-y divide-line">
           {incomes.map((i) => (
             <li key={i.id}>
@@ -220,7 +232,7 @@ function PeriodForm({ onDone }) {
         </label>
       </div>
       <div>
-        <span className="label">Pemasukan pertama (opsional, bisa ditambah nanti)</span>
+        <span className="label">Dana masuk pertama (opsional, bisa ditambah nanti)</span>
         <div className="grid grid-cols-[1fr_1.4fr] gap-2">
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Gaji" />
           <AmountInput value={amount} onChange={setAmount} />
@@ -234,7 +246,7 @@ function PeriodForm({ onDone }) {
   )
 }
 
-function IncomeSheet({ open, item, onClose }) {
+export function IncomeSheet({ open, item, onClose }) {
   const { period, saveIncome, deleteIncome, today } = useData()
   const [name, setName] = useState('')
   const [amount, setAmount] = useState(0)
@@ -260,14 +272,16 @@ function IncomeSheet({ open, item, onClose }) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={item ? 'Ubah pemasukan' : 'Tambah pemasukan'}>
+    <Sheet open={open} onClose={onClose} title={item ? 'Ubah dana masuk' : 'Tambah dana masuk'}>
       <form onSubmit={submit} className="space-y-4">
-        <label className="block"><span className="label">Nama pemasukan</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="cth. Gaji, Bonus, Freelance" />
+        <label className="block"><span className="label">Nama</span>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="cth. Gaji, Bonus, Dana tambahan" />
         </label>
         <div><span className="label">Nominal</span><AmountInput big value={amount} onChange={setAmount} /></div>
         <label className="block"><span className="label">Tanggal masuk</span>
           <input type="date" className="input" value={date} min={period.start_date} max={period.end_date} onChange={(e) => setDate(e.target.value)} required />
+        
+          <span className="block text-xs text-muted mt-1.5">Jatah harian bertambah mulai tanggal ini sampai akhir periode.</span>
         </label>
         <div className="flex gap-2">
           {item && <button type="button" disabled={busy} onClick={remove} className="btn-danger"><Trash2 size={16} /></button>}

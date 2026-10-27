@@ -30,25 +30,52 @@ export function allocate(units, total, overrides = {}) {
   }
   const rest = Math.max(0, total - fixed)
   const W = free.reduce((s, u) => s + u.weight, 0)
-  let used = 0
-  free.forEach((u, i) => {
-    const v = i === free.length - 1 ? rest - used : Math.floor((rest * u.weight) / W)
-    out[u.key] = v
-    used += v
-  })
+  // Metode sisa terbesar: tiap unit dapat floor(bagian), sisa rupiah dibagikan ke pecahan terbesar
+  const exact = free.map((u) => rest * (W > 0 ? u.weight / W : 1 / free.length))
+  const base = exact.map((x) => Math.floor(x + 1e-6))
+  let left = rest - base.reduce((a, b) => a + b, 0)
+  const order = exact.map((x, i) => [x - base[i], i]).sort((a, b) => b[0] - a[0])
+  for (let k = 0; left > 0 && free.length; k = (k + 1) % free.length, left--) base[order[k][1]] += 1
+  free.forEach((u, i) => { out[u.key] = base[i] })
   return { amounts: out, overAllocated: fixed > total ? fixed - total : 0 }
 }
 
 /**
+ * Bobot dana per hari.
+ * Tagihan dipotong dulu dari pemasukan paling awal. Sisa setiap pemasukan dibagi rata
+ * ke hari-hari mulai TANGGAL MASUKNYA sampai akhir periode — jadi dana tambahan di
+ * tengah bulan hanya menambah jatah hari itu dan seterusnya.
+ */
+export function dayWeights(period, incomes, billsTotal) {
+  const days = rangeDays(period.start_date, period.end_date)
+  const w = Object.fromEntries(days.map((d) => [d, 0]))
+  const clamp = (d) => (!d || d < period.start_date ? period.start_date : d > period.end_date ? period.end_date : d)
+  const list = incomes
+    .map((i) => ({ amount: Number(i.amount) || 0, date: clamp(i.date) }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+  let billsLeft = billsTotal
+  for (const inc of list) {
+    const take = Math.min(inc.amount, billsLeft)
+    billsLeft -= take
+    const net = inc.amount - take
+    if (net <= 0) continue
+    const span = days.filter((d) => d >= inc.date)
+    for (const d of span) w[d] += net / span.length
+  }
+  return w
+}
+
+/**
  * Susun rencana budget lengkap untuk satu periode.
- * incomes: pemasukan periode ini; bills: tagihan yang jatuh tempo di periode ini.
- * Budget fleksibel = total pemasukan − semua tagihan (dicentang maupun belum).
+ * incomes: dana masuk periode ini; bills: tagihan yang jatuh tempo di periode ini.
+ * Budget fleksibel = total dana masuk − semua tagihan (dicentang maupun belum).
  */
 export function computePlan({ period, incomes = [], bills = [], overrides = [] }) {
   const income = incomes.reduce((s, i) => s + Number(i.amount), 0)
   const billsTotal = bills.reduce((s, b) => s + Number(b.amount), 0)
   const billsPaid = bills.filter((b) => b.paid).reduce((s, b) => s + Number(b.amount), 0)
   const flexible = Math.max(0, income - billsTotal)
+  const w = dayWeights(period, incomes, billsTotal)
 
   const weekOv = {}
   const dayOv = {}
@@ -58,21 +85,21 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
   }
 
   const weeks = buildWeeks(period.start_date, period.end_date)
-  const wAlloc = allocate(weeks.map((w) => ({ key: w.index, weight: w.days.length })), flexible, weekOv)
+  const wAlloc = allocate(weeks.map((wk) => ({ key: wk.index, weight: wk.days.reduce((a, d) => a + w[d], 0) })), flexible, weekOv)
 
   const dayAlloc = {}
-  const outWeeks = weeks.map((w) => {
-    const amount = wAlloc.amounts[w.index]
+  const outWeeks = weeks.map((wk) => {
+    const amount = wAlloc.amounts[wk.index]
     const dOv = {}
-    w.days.forEach((d) => { if (dayOv[d] != null) dOv[d] = dayOv[d] })
-    const dA = allocate(w.days.map((d) => ({ key: d, weight: 1 })), amount, dOv)
-    w.days.forEach((d) => { dayAlloc[d] = dA.amounts[d] })
+    wk.days.forEach((d) => { if (dayOv[d] != null) dOv[d] = dayOv[d] })
+    const dA = allocate(wk.days.map((d) => ({ key: d, weight: w[d] })), amount, dOv)
+    wk.days.forEach((d) => { dayAlloc[d] = dA.amounts[d] })
     return {
-      ...w,
+      ...wk,
       amount,
-      isCustom: weekOv[w.index] != null,
+      isCustom: weekOv[wk.index] != null,
       overAllocated: dA.overAllocated,
-      days: w.days.map((d) => ({ date: d, amount: dA.amounts[d], isCustom: dayOv[d] != null })),
+      days: wk.days.map((d) => ({ date: d, amount: dA.amounts[d], isCustom: dayOv[d] != null })),
     }
   })
 

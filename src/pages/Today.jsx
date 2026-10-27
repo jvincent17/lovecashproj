@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Wallet } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { rupiah, rupiahShort } from '../lib/format.js'
 import { addDays, fmtLong } from '../lib/dates.js'
@@ -11,12 +11,14 @@ import NoPeriod from '../components/NoPeriod.jsx'
 import ExpenseSheet from '../components/ExpenseSheet.jsx'
 import ExpenseList from '../components/ExpenseList.jsx'
 import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
+import { IncomeSheet } from './Month.jsx'
 
 export default function Today() {
   const { period, periods, plan, status, expenses, today, saldo, spentTotal, selectPeriod, profile } = useData()
   const [day, setDay] = useState(today)
   const [sheet, setSheet] = useState({ open: false, expense: null })
   const [editJatah, setEditJatah] = useState(false)
+  const [addIncome, setAddIncome] = useState(false)
 
   // Halaman ini selalu memakai periode yang memuat hari ini
   const current = periods.find((p) => p.start_date <= today && p.end_date >= today)
@@ -32,6 +34,7 @@ export default function Today() {
 
   const week = plan.weeks.find((w) => w.start <= day && w.end >= day)
   const dayInfo = week.days.find((d) => d.date === day)
+  const jatahLeft = s.alloc - s.spent
   const weekSpent = expenses.filter((e) => e.date >= week.start && e.date <= week.end).reduce((a, e) => a + Number(e.amount), 0)
   const dayItems = expenses.filter((e) => e.date === day)
   const isToday = day === today
@@ -61,20 +64,22 @@ export default function Today() {
 
       <section className="hero p-6">
         <img src="/img/hero-today.webp" alt="" className="hero-photo" />
-        <p className="text-sm text-muted">Dana tersedia {isToday ? 'hari ini' : 'hari itu'}</p>
-        <p className={`text-4xl md:text-5xl font-semibold tabular mt-1 ${s.remaining < 0 ? 'text-danger' : ''}`}>
-          {rupiah(s.remaining)}
+        <p className="text-sm text-muted flex items-center gap-1.5">
+          Jatah {isToday ? 'hari ini' : 'hari itu'}
+          {dayInfo?.isCustom && <span className="text-[10px] px-1.5 py-0.5 rounded bg-card/70 text-accent">diatur manual</span>}
         </p>
-        <Bar value={s.spent} max={Math.max(0, s.available)} className="mt-5" />
+        <button onClick={() => setEditJatah(true)} className="group inline-flex items-baseline gap-2 mt-1 text-left" aria-label="Ubah jatah">
+          <span className={`text-4xl md:text-5xl font-semibold tabular ${jatahLeft < 0 ? 'text-danger' : ''}`}>{rupiah(jatahLeft)}</span>
+          <Pencil size={16} className="text-muted group-hover:text-accent" />
+        </button>
+        <p className="text-xs text-muted mt-1">
+          {s.spent > 0 ? `sisa dari jatah ${rupiah(s.alloc)} · terpakai ${rupiah(s.spent)}` : 'belum ada pengeluaran'}
+        </p>
+        <Bar value={s.spent} max={Math.max(0, s.alloc)} className="mt-4" />
         <dl className="grid grid-cols-3 gap-2 mt-4 text-sm">
           <div>
-            <dt className="text-muted text-xs">Jatah</dt>
-            <dd>
-              <button onClick={() => setEditJatah(true)} className="tabular font-medium inline-flex items-center gap-1 hover:text-accent">
-                {rupiah(s.alloc)} <Pencil size={12} className="text-muted" />
-              </button>
-              {dayInfo?.isCustom && <span className="block text-[10px] text-accent">diatur manual</span>}
-            </dd>
+            <dt className="text-muted text-xs">Dana tersedia</dt>
+            <dd className={`tabular font-medium ${s.remaining < 0 ? 'text-danger' : ''}`}>{rupiah(s.remaining)}</dd>
           </div>
           <div>
             <dt className="text-muted text-xs">Dari kemarin</dt>
@@ -84,6 +89,7 @@ export default function Today() {
           </div>
           <div><dt className="text-muted text-xs">Terpakai</dt><dd className="tabular font-medium">{rupiah(s.spent)}</dd></div>
         </dl>
+        <p className="text-[11px] text-muted mt-2">Dana tersedia = jatah + sisa/minus dari hari sebelumnya − terpakai.</p>
         <div className="grid grid-cols-2 gap-2 mt-5">
           <button onClick={() => setEditJatah(true)} className="btn-ghost bg-card/70"><Pencil size={16} /> Atur jatah</button>
           <button onClick={() => setSheet({ open: true, expense: null })} className="btn-primary"><Plus size={18} /> Catat</button>
@@ -95,6 +101,16 @@ export default function Today() {
         <MiniStat label="Sisa minggu" value={week.amount - weekSpent} hint={`dari ${rupiah(week.amount)}`} />
         <MiniStat label="Sisa budget" value={plan.flexible - spentTotal} hint="bulan ini" />
       </div>
+
+      <button onClick={() => setAddIncome(true)}
+        className="w-full card px-4 py-3 flex items-center gap-3 text-left hover:border-accent transition">
+        <span className="size-9 rounded-xl bg-accent-soft text-accent grid place-items-center"><Wallet size={17} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium">Ada dana masuk?</span>
+          <span className="block text-xs text-muted">Dana bulan ini {rupiah(plan.income)} · tambah bonus, kiriman, dll.</span>
+        </span>
+        <Plus size={18} className="text-accent" />
+      </button>
 
       <section className="card p-5">
         <div className="flex items-center justify-between mb-1">
@@ -120,6 +136,7 @@ export default function Today() {
 
       <ExpenseSheet open={sheet.open} expense={sheet.expense} defaultDate={day}
         onClose={() => setSheet({ open: false, expense: null })} />
+      <IncomeSheet open={addIncome} item={null} onClose={() => setAddIncome(false)} />
       <JatahSheet open={editJatah} onClose={() => setEditJatah(false)} day={day} info={dayInfo} />
     </div>
   )

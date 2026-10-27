@@ -72,11 +72,11 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 - **Cashflow bersama:** semua data milik satu cashflow (dompet). Di **Pengaturan** ada kode undangan 6 huruf. Pasangan cukup memilih **Gabung dengan kode**, lalu keduanya melihat dan mengisi data yang sama.
 - **Login** bisa memakai username atau email. Username diatur di Pengaturan → Profil.
 - **Periode** berjalan dari tanggal gajian sampai sehari sebelum gajian berikutnya.
-- **Pemasukan** bisa lebih dari satu per periode (Gaji, Bonus, Freelance, dll.).
+- **Dana bulan ini** = semua dana masuk di periode itu (Gaji, Bonus, Dana tambahan, dll.). Dana tambahan di tengah bulan menambah jatah harian mulai tanggal masuknya sampai akhir periode; hari-hari sebelumnya tidak berubah. Tagihan dipotong dari dana yang masuk paling awal.
 - **Tagihan** masuk ke periode sesuai tanggal jatuh temponya, dan bisa dilihat untuk bulan ini maupun bulan depan. Tagihan yang dicentang (sudah dibayar) mengurangi **Saldo**. Tagihan bertanda "ulangi setiap bulan" otomatis disalin saat periode baru dibuat. Tagihan jenis Cicilan/Kredit bisa dihubungkan ke catatan hutang.
-- **Budget harian/mingguan** = total pemasukan − semua tagihan periode itu. Nilainya dibagi ke minggu (per 7 hari sejak tanggal gajian), lalu ke hari. Jatah minggu atau hari bisa diatur manual.
+- **Budget harian/mingguan** = dana bulan ini − semua tagihan periode itu. Nilainya dibagi ke minggu (per 7 hari sejak tanggal gajian), lalu ke hari. Jatah minggu atau hari bisa diatur manual.
 - **Sisa harian dibawa ke hari berikutnya.** Jatah hari ini bisa diubah langsung dari halaman **Hari ini**.
-- **Saldo** = pemasukan − tagihan yang sudah dibayar − pengeluaran.
+- **Saldo** = dana bulan ini − tagihan yang sudah dibayar − pengeluaran.
 
 ## Struktur folder
 

@@ -57,3 +57,30 @@ test('addMonths dibatasi akhir bulan', async () => {
   assert.equal(addMonths('2026-10-25', 1), '2026-11-25')
   assert.equal(addMonths('2026-12-10', 1), '2027-01-10')
 })
+
+test('dana tambahan di tengah periode hanya menambah hari itu dan seterusnya', () => {
+  const period = { start_date: '2026-10-25', end_date: '2026-11-24' } // 31 hari
+  const base = computePlan({ period, incomes: [{ amount: 3_100_000, date: '2026-10-25' }] })
+  const plus = computePlan({ period, incomes: [{ amount: 3_100_000, date: '2026-10-25' }, { amount: 109_000, date: '2026-10-27' }] })
+  assert.equal(plus.flexible, 3_209_000)
+  // hari sebelum dana masuk tidak berubah (toleransi pembulatan 1 rupiah)
+  assert.ok(Math.abs(plus.dayAlloc['2026-10-25'] - base.dayAlloc['2026-10-25']) <= 1)
+  assert.ok(Math.abs(plus.dayAlloc['2026-10-26'] - base.dayAlloc['2026-10-26']) <= 1)
+  assert.ok(plus.dayAlloc['2026-10-27'] > base.dayAlloc['2026-10-27'])
+  const total = Object.values(plus.dayAlloc).reduce((s, v) => s + v, 0)
+  assert.equal(total, 3_209_000)
+})
+
+test('tagihan dipotong dari pemasukan paling awal', () => {
+  const period = { start_date: '2026-10-25', end_date: '2026-11-24' }
+  const plan = computePlan({
+    period,
+    incomes: [{ amount: 1_000_000, date: '2026-10-25' }, { amount: 2_000_000, date: '2026-11-10' }],
+    bills: [{ amount: 1_000_000 }],
+  })
+  // gaji pertama habis untuk tagihan, jadi hari sebelum 10 Nov belum dapat jatah
+  assert.equal(plan.dayAlloc['2026-10-25'], 0)
+  assert.equal(plan.dayAlloc['2026-11-09'], 0)
+  assert.ok(plan.dayAlloc['2026-11-10'] > 0)
+  assert.equal(Object.values(plan.dayAlloc).reduce((s, v) => s + v, 0), 2_000_000)
+})
