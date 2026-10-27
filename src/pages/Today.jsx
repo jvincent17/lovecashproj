@@ -12,6 +12,8 @@ import ExpenseSheet from '../components/ExpenseSheet.jsx'
 import ExpenseList from '../components/ExpenseList.jsx'
 import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
 import { IncomeSheet } from './Month.jsx'
+import Reminders from '../components/Reminders.jsx'
+import QuickTemplates from '../components/QuickTemplates.jsx'
 
 export default function Today() {
   const { period, periods, plan, status, expenses, today, saldo, spentTotal, selectPeriod, profile } = useData()
@@ -19,6 +21,15 @@ export default function Today() {
   const [sheet, setSheet] = useState({ open: false, expense: null })
   const [editJatah, setEditJatah] = useState(false)
   const [addIncome, setAddIncome] = useState(false)
+
+  // Shortcut dari ikon aplikasi: /?catat=1 langsung membuka form catat
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search)
+    if (qs.get('catat') === '1') {
+      setSheet({ open: true, expense: null })
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   // Halaman ini selalu memakai periode yang memuat hari ini
   const current = periods.find((p) => p.start_date <= today && p.end_date >= today)
@@ -72,7 +83,7 @@ export default function Today() {
           <span className={`text-4xl md:text-5xl font-semibold tabular ${jatahLeft < 0 ? 'text-danger' : ''}`}>{rupiah(jatahLeft)}</span>
           <Pencil size={16} className="text-muted group-hover:text-accent" />
         </button>
-        <p className="text-xs text-muted mt-1">
+        <p className="text-xs text-muted mt-1 money">
           {s.spent > 0 ? `sisa dari jatah ${rupiah(s.alloc)} · terpakai ${rupiah(s.spent)}` : 'belum ada pengeluaran'}
         </p>
         <Bar value={s.spent} max={Math.max(0, s.alloc)} className="mt-4" />
@@ -96,6 +107,10 @@ export default function Today() {
         </div>
       </section>
 
+      <QuickTemplates day={day} />
+
+      <Reminders />
+
       <div className="grid grid-cols-3 gap-3">
         <MiniStat label="Saldo" value={saldo} hint="uang di tangan" />
         <MiniStat label="Sisa minggu" value={week.amount - weekSpent} hint={`dari ${rupiah(week.amount)}`} />
@@ -107,7 +122,7 @@ export default function Today() {
         <span className="size-9 rounded-xl bg-accent-soft text-accent grid place-items-center"><Wallet size={17} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium">Ada dana masuk?</span>
-          <span className="block text-xs text-muted">Dana bulan ini {rupiah(plan.income)} · tambah bonus, kiriman, dll.</span>
+          <span className="block text-xs text-muted money">Dana bulan ini {rupiah(plan.income)} · tambah bonus, kiriman, dll.</span>
         </span>
         <Plus size={18} className="text-accent" />
       </button>
@@ -149,7 +164,7 @@ function MiniStat({ label, value, hint }) {
       <p className={`text-sm md:text-base font-semibold tabular mt-0.5 whitespace-nowrap ${value < 0 ? 'text-danger' : ''}`}>
         <span className="md:hidden">Rp {rupiahShort(value)}</span><span className="hidden md:inline">{rupiah(value)}</span>
       </p>
-      <p className="text-[10px] text-muted mt-0.5 truncate">{hint}</p>
+      <p className="text-[10px] text-muted mt-0.5 truncate money">{hint}</p>
     </div>
   )
 }

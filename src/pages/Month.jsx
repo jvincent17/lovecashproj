@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Check, Repeat } from 'lucide-react'
+import { Plus, Trash2, Check, Repeat, Pencil, Download } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { rupiah } from '../lib/format.js'
 import { addDays, cycleFor, fmtRange, fmtShort } from '../lib/dates.js'
@@ -8,6 +8,7 @@ import AmountInput from '../components/AmountInput.jsx'
 import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
 import Bar from '../components/Bar.jsx'
 import WalletPicker from '../components/WalletPicker.jsx'
+import { exportPeriod } from '../lib/exportXlsx.js'
 
 const KIND = {
   bill: { label: 'Tagihan', cls: 'bg-soft text-muted' },
@@ -17,8 +18,10 @@ const KIND = {
 
 export default function Month() {
   const { period, periods, plan, incomes, billsThis, billsNext, nextRange, expenses, saldo, spentTotal,
-    selectPeriod, deletePeriod, memberName, members } = useData()
+    selectPeriod, deletePeriod, memberName, members, catById, walletById } = useData()
   const [newPeriod, setNewPeriod] = useState(false)
+  const [editPeriod, setEditPeriod] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [income, setIncome] = useState({ open: false, item: null })
   const [bill, setBill] = useState({ open: false, item: null, defaultDue: null })
   const [billTab, setBillTab] = useState('this')
@@ -43,6 +46,7 @@ export default function Month() {
         <select className="input flex-1" value={period.id} onChange={(e) => selectPeriod(e.target.value)}>
           {periods.map((p) => <option key={p.id} value={p.id}>{fmtRange(p.start_date, p.end_date)}</option>)}
         </select>
+        <button onClick={() => setEditPeriod(true)} className="btn-ghost shrink-0 px-3" aria-label="Ubah tanggal periode"><Pencil size={16} /></button>
         <button onClick={() => setNewPeriod(true)} className="btn-ghost shrink-0"><Plus size={16} /> Periode</button>
       </div>
 
@@ -53,11 +57,17 @@ export default function Month() {
           <div>
             <p className="text-sm text-muted">Dana bulan ini</p>
             <p className="text-xl md:text-3xl font-semibold tabular whitespace-nowrap">{rupiah(plan.income)}</p>
-            {incomes.length > 1 && (
-              <p className="text-xs text-accent mt-0.5">
-                termasuk +{rupiah(plan.income - Number(incomes[0].amount))} dana tambahan
-              </p>
-            )}
+            {(() => {
+              const carried = incomes.filter((i) => i.is_rollover).reduce((a, i) => a + Number(i.amount), 0)
+              const regular = incomes.filter((i) => !i.is_rollover)
+              const extra = regular.slice(1).reduce((a, i) => a + Number(i.amount), 0)
+              return (
+                <>
+                  {carried > 0 && <p className="text-xs text-muted mt-0.5 money">termasuk {rupiah(carried)} sisa bulan lalu</p>}
+                  {extra > 0 && <p className="text-xs text-accent mt-0.5 money">termasuk +{rupiah(extra)} dana tambahan</p>}
+                </>
+              )
+            })()}
           </div>
           <div>
             <p className="text-sm text-muted">Saldo sekarang</p>
@@ -72,7 +82,7 @@ export default function Month() {
         </dl>
         <Bar value={spentTotal} max={plan.flexible} className="mt-3 max-w-xs" />
         {plan.billsTotal > plan.income && (
-          <p className="text-xs text-danger mt-3">Tagihan melebihi dana bulan ini sebesar {rupiah(plan.billsTotal - plan.income)}.</p>
+          <p className="text-xs text-danger mt-3 money">Tagihan melebihi dana bulan ini sebesar {rupiah(plan.billsTotal - plan.income)}.</p>
         )}
       </section>
 
@@ -92,7 +102,7 @@ export default function Month() {
               <button onClick={() => setIncome({ open: true, item: i })} className="w-full flex items-center gap-3 py-3 text-left">
                 <span className="size-9 rounded-xl bg-accent-soft text-accent grid place-items-center text-sm">＋</span>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm truncate">{i.name}</span>
+                  <span className="block text-sm truncate">{i.name}{i.is_rollover && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-soft text-muted">dari periode lalu</span>}</span>
                   <span className="block text-xs text-muted">{fmtShort(i.date)}{shared && i.created_by ? ` · ${memberName(i.created_by)}` : ''}</span>
                 </span>
                 <span className="text-sm tabular font-medium text-accent">+{rupiah(i.amount)}</span>
@@ -132,7 +142,7 @@ export default function Month() {
         </ul>
         {shownBills.length > 0 && (
           <div className="flex justify-between border-t border-line pt-3 mt-1 text-sm">
-            <span className="text-muted">Dibayar {rupiah(shownPaid)}</span>
+            <span className="text-muted money">Dibayar {rupiah(shownPaid)}</span>
             <span className="font-medium tabular">Total {rupiah(shownTotal)}</span>
           </div>
         )}
@@ -153,8 +163,18 @@ export default function Month() {
 
       <section className="card p-5">
         <h2 className="font-semibold mb-4">Pengeluaran per kategori</h2>
-        <CategoryBreakdown items={expenses} />
+        <CategoryBreakdown items={expenses} withLimits />
       </section>
+
+      <button disabled={exporting}
+        onClick={async () => {
+          setExporting(true)
+          try { await exportPeriod({ period, plan, saldo, spentTotal, incomes, bills: billsThis, expenses, catById, walletById, memberName }) }
+          finally { setExporting(false) }
+        }}
+        className="btn-ghost w-full">
+        <Download size={16} /> {exporting ? 'Menyiapkan file…' : 'Export periode ini ke Excel'}
+      </button>
 
       <button
         onClick={() => { if (confirm('Hapus periode ini beserta pemasukan & pengaturan budgetnya? Pengeluaran dan tagihan tidak ikut terhapus.')) deletePeriod(period.id) }}
@@ -165,6 +185,7 @@ export default function Month() {
       <Sheet open={newPeriod} onClose={() => setNewPeriod(false)} title="Periode baru">
         <PeriodForm onDone={() => setNewPeriod(false)} />
       </Sheet>
+      <PeriodEditSheet open={editPeriod} onClose={() => setEditPeriod(false)} />
       <IncomeSheet open={income.open} item={income.item} onClose={() => setIncome({ open: false, item: null })} />
       <BillSheet open={bill.open} item={bill.item} defaultDue={bill.defaultDue} onClose={() => setBill({ open: false, item: null })} />
     </div>
@@ -204,7 +225,7 @@ function BillRow({ b, onEdit }) {
 }
 
 function PeriodForm({ onDone }) {
-  const { payday, periods, today, createPeriod } = useData()
+  const { payday, periods, today, createPeriod, periodSaldo } = useData()
   const latest = periods[0]
   const def = latest && latest.end_date >= today
     ? (() => { const s = addDays(latest.end_date, 1); return { start: s, end: cycleFor(s, payday).end } })()
@@ -214,12 +235,30 @@ function PeriodForm({ onDone }) {
   const [end, setEnd] = useState(def.end)
   const [name, setName] = useState('Gaji')
   const [amount, setAmount] = useState(0)
+  const [walletId, setWalletId] = useState(null)
+  const [carry, setCarry] = useState(true)
+  const [prevSaldo, setPrevSaldo] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  const prev = periods.find((p) => p.start_date < start)
+  useEffect(() => {
+    let alive = true
+    setPrevSaldo(null)
+    if (prev) periodSaldo(prev).then((v) => alive && setPrevSaldo(v)).catch(() => {})
+    return () => { alive = false }
+  }, [prev?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
-    try { await createPeriod({ start_date: start, end_date: end, firstIncome: { name, amount } }); onDone() } catch { /* */ } finally { setBusy(false) }
+    try {
+      await createPeriod({
+        start_date: start, end_date: end,
+        firstIncome: { name, amount, wallet_id: walletId },
+        rollover: carry && prevSaldo > 0 ? prevSaldo : 0,
+      })
+      onDone()
+    } catch { /* */ } finally { setBusy(false) }
   }
 
   return (
@@ -239,11 +278,64 @@ function PeriodForm({ onDone }) {
           <AmountInput value={amount} onChange={setAmount} />
         </div>
       </div>
+      {amount > 0 && <WalletPicker label="Masuk ke" value={walletId} onChange={setWalletId} />}
+
+      {prev && prevSaldo != null && (
+        prevSaldo > 0 ? (
+          <label className="flex items-start gap-3 rounded-2xl bg-accent-soft p-3.5 cursor-pointer">
+            <input type="checkbox" checked={carry} onChange={(e) => setCarry(e.target.checked)} className="size-4 mt-0.5 accent-[var(--accent)]" />
+            <span className="text-sm">
+              <b>Bawa sisa bulan lalu</b> <span className="tabular">({rupiah(prevSaldo)})</span>
+              <span className="block text-xs text-muted mt-0.5">
+                Sisa saldo periode {fmtRange(prev.start_date, prev.end_date)} ikut jadi dana periode ini dan menambah jatah harian.
+                Saldo di menu Lokasi tidak berubah (uangnya memang sudah ada di sana).
+              </span>
+            </span>
+          </label>
+        ) : prevSaldo < 0 ? (
+          <p className="text-xs rounded-2xl bg-danger-soft text-danger p-3.5 money">
+            Periode lalu minus {rupiah(-prevSaldo)}, jadi tidak ada sisa yang dibawa.
+          </p>
+        ) : null
+      )}
+
       <p className="text-xs text-muted">
         Tanggal gajian: {payday} (ubah di Pengaturan).{latest && ' Tagihan berulang dari periode sebelumnya disalin otomatis.'}
       </p>
       <button disabled={busy} className="btn-primary w-full">{busy ? 'Menyimpan…' : 'Mulai periode'}</button>
     </form>
+  )
+}
+
+function PeriodEditSheet({ open, onClose }) {
+  const { period, updatePeriod } = useData()
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { if (open && period) { setStart(period.start_date); setEnd(period.end_date) } }, [open, period])
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try { await updatePeriod(period.id, { start_date: start, end_date: end }); onClose() } catch { /* */ } finally { setBusy(false) }
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title="Ubah tanggal periode">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <label><span className="label">Mulai</span>
+            <input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} required />
+          </label>
+          <label><span className="label">Sampai</span>
+            <input type="date" className="input" value={end} min={start} onChange={(e) => setEnd(e.target.value)} required />
+          </label>
+        </div>
+        <p className="text-xs text-muted">
+          Contoh: gajian pindah ke akhir bulan → potong periode ini sampai sehari sebelum gajian berikutnya.
+          Periode tidak boleh bertumpuk dengan periode lain. Pengeluaran dan tagihan otomatis ikut periode sesuai tanggalnya.
+        </p>
+        <button disabled={busy} className="btn-primary w-full">{busy ? 'Menyimpan…' : 'Simpan'}</button>
+      </form>
+    </Sheet>
   )
 }
 

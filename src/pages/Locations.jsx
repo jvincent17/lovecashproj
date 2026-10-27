@@ -28,7 +28,7 @@ export default function Locations() {
             return v > 0 ? <div key={w.id} className="h-full" style={{ width: `${(v / totalMoney) * 100}%`, background: i % 2 ? 'var(--accent-2)' : 'var(--accent)' }} /> : null
           })}
         </div>
-        <div className="flex justify-between text-xs text-muted mt-2">
+        <div className="flex justify-between text-xs text-muted mt-2 money">
           <span>Sudah dialokasikan {rupiah(located)}</span>
           <span>Belum {rupiah(unlocated)}</span>
         </div>
@@ -233,7 +233,7 @@ function TransferSheet({ open, item, from: defFrom, to: defTo, onClose }) {
           <span className="label">Nominal</span>
           <AmountInput big value={amount} onChange={setAmount} />
           <div className="flex justify-between text-xs mt-1.5">
-            <span className={amount > available && !item ? 'text-danger' : 'text-muted'}>Tersedia {rupiah(available)}</span>
+            <span className={`money ${amount > available && !item ? 'text-danger' : 'text-muted'}`}>Tersedia {rupiah(available)}</span>
             {available > 0 && <button type="button" onClick={() => setAmount(available)} className="text-accent">Pindahkan semua</button>}
           </div>
         </div>

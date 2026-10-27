@@ -10,6 +10,8 @@ import Month from './pages/Month.jsx'
 import Debts from './pages/Debts.jsx'
 import Settings from './pages/Settings.jsx'
 import Locations from './pages/Locations.jsx'
+import History from './pages/History.jsx'
+import Reports from './pages/Reports.jsx'
 
 function Gate() {
   const { session, loading } = useAuth()
@@ -24,6 +26,8 @@ function Gate() {
           <Route path="bulan" element={<Month />} />
           <Route path="hutang" element={<Debts />} />
           <Route path="lokasi" element={<Locations />} />
+          <Route path="riwayat" element={<History />} />
+          <Route path="laporan" element={<Reports />} />
           <Route path="pengaturan" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

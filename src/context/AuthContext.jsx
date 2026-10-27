@@ -20,7 +20,11 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     loading,
-    signOut: () => supabase.auth.signOut(),
+    signOut: async () => {
+      // hapus cache data offline supaya tidak terbaca akun lain di perangkat ini
+      try { for (const k of await caches.keys()) if (k.includes('-data')) await caches.delete(k) } catch { /* */ }
+      return supabase.auth.signOut()
+    },
   }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }

@@ -1,10 +1,23 @@
 {
+  "id": "/",
   "name": "Duit Kara",
   "short_name": "Duit Kara",
-  "description": "Atur gaji bulanan, budget mingguan & harian, dan catat hutang.",
+  "description": "Atur dana bulanan, jatah harian, tagihan, lokasi dana, dan hutang berdua.",
+  "lang": "id",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#fdf6f9",
-  "theme_color": "#c026a5",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "theme_color": "#fdf6f9",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Catat pengeluaran", "url": "/?catat=1", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Lokasi dana", "url": "/lokasi", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
 }

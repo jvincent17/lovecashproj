@@ -81,7 +81,7 @@ function DebtCard({ d, today, onClick }) {
           : d.due_date && <span className={`text-xs ${overdue ? 'text-danger font-medium' : 'text-muted'}`}>{overdue ? 'Lewat ' : 'Jatuh tempo '}{fmtShort(d.due_date)}</span>}
       </div>
       <p className="text-xl font-semibold tabular mt-2">{rupiah(d.rest)}</p>
-      <p className="text-xs text-muted">sisa dari {rupiah(d.amount)}</p>
+      <p className="text-xs text-muted money">sisa dari {rupiah(d.amount)}</p>
       <Bar value={d.paid} max={Number(d.amount)} className="mt-3" />
       {d.note && <p className="text-xs text-muted mt-2 truncate">{d.note}</p>}
     </button>

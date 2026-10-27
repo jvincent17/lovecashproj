@@ -79,6 +79,17 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 - **Saldo** = dana bulan ini − tagihan yang sudah dibayar − pengeluaran.
 - **Lokasi dana** (GoPay, Cash, BCA, dll.) bisa ditambah bebas, dengan emoji atau logo sendiri. Dana masuk, pengeluaran, dan tagihan dibayar masing-masing bisa memilih lokasi. Yang tidak dipilih masuk ke **Unlocated Money**. Gunakan **Pindah dana** untuk memindahkan uang antarlokasi. Saldo tiap lokasi dihitung otomatis sepanjang waktu. Menghapus lokasi mengembalikan saldo dan transaksinya ke Unlocated Money.
 
+- **Bawa sisa bulan lalu:** saat membuat periode baru, sisa saldo periode sebelumnya bisa dibawa sebagai dana "Sisa bulan lalu". Dana ini menambah budget, tapi tidak menambah saldo lokasi (uangnya memang sudah ada di lokasi masing-masing).
+- **Periode** bisa diubah tanggalnya (ikon pensil di menu Bulan) dan tidak boleh bertumpuk.
+- **Batas per kategori**, **template catat cepat**, **pengingat jatuh tempo** (≤ 3 hari), **Riwayat** (cari & filter), **Laporan** (grafik), **mode privasi** (ikon mata), dan **export Excel** tersedia di aplikasi.
+- **Sinkron realtime:** input pasangan langsung muncul tanpa refresh (butuh migrasi 004).
+- **PWA:** bisa di-install di HP dan tetap menampilkan data terakhir saat offline.
+
+## Migrasi database
+
+Kalau database sudah berjalan, jalankan file di `supabase/migrations/` yang belum pernah dijalankan, **berurutan**:
+`002_foto.sql` → `003_lokasi_dana.sql` → `004_fitur_lanjutan.sql`. Untuk database baru, cukup jalankan `schema.sql`.
+
 ## Struktur folder
 
 ```

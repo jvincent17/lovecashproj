@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { addDays, addMonths, cycleFor, todayISO } from '../lib/dates.js'
+import { addDays, addMonths, cycleFor, fmtRange, todayISO } from '../lib/dates.js'
 import { computePlan, dailyStatus, sumBy } from '../lib/budget.js'
 import { useAuth } from './AuthContext.jsx'
 import { removePhoto, uploadPhoto } from '../lib/photos.js'
@@ -29,6 +29,7 @@ export function DataProvider({ children }) {
   const [wallets, setWallets] = useState([])
   const [balances, setBalances] = useState({}) // wallet_id ('' = Unlocated) -> saldo
   const [transfers, setTransfers] = useState([])
+  const [templates, setTemplates] = useState([])
   const [payments, setPayments] = useState([])
 
   const [selectedId, setSelectedId] = useState(null)
@@ -64,6 +65,10 @@ export function DataProvider({ children }) {
     const byId = Object.fromEntries(profs.map((x) => [x.id, x]))
     setMembers(memRows.map((m) => ({ ...m, profile: byId[m.user_id] || null })))
   }, [user.id])
+
+  const loadTemplates = useCallback(async (cf) => {
+    setTemplates(must(await supabase.from('quick_templates').select('*').eq('cashflow_id', cf).order('sort').order('created_at')))
+  }, [])
 
   const loadCategories = useCallback(async (cf) => {
     setCategories(must(await supabase.from('categories').select('*').eq('cashflow_id', cf).order('sort').order('created_at')))
@@ -115,14 +120,14 @@ export function DataProvider({ children }) {
 
   /** Muat semua data untuk cashflow aktif. */
   const loadAll = useCallback(async (cf) => {
-    await Promise.all([loadCashflowMeta(cf), loadCategories(cf), loadDebts(cf), loadWallets(cf)])
+    await Promise.all([loadCashflowMeta(cf), loadCategories(cf), loadDebts(cf), loadWallets(cf), loadTemplates(cf)])
     const ps = await loadPeriods(cf)
     setSelectedId((prev) => {
       if (prev && ps.some((p) => p.id === prev)) return prev
       const current = ps.find((p) => p.start_date <= today && p.end_date >= today)
       return (current || ps[0])?.id ?? null
     })
-  }, [loadCashflowMeta, loadCategories, loadDebts, loadWallets, loadPeriods, today])
+  }, [loadCashflowMeta, loadCategories, loadDebts, loadWallets, loadTemplates, loadPeriods, today])
 
   // initial load
   useEffect(() => {
@@ -153,12 +158,36 @@ export function DataProvider({ children }) {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [cfId, loadAll, loadPeriodData, period, nextRange])
 
+  // Sinkron realtime: perubahan dari pasangan langsung dimuat ulang
+  const liveRef = useRef({})
+  liveRef.current = { period, nextRange, loadAll, loadPeriodData }
+  useEffect(() => {
+    if (!cfId || !supabase.channel) return
+    let timer = null
+    const refresh = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const { period: p, nextRange: n, loadAll: la, loadPeriodData: lp } = liveRef.current
+        la(cfId).then(() => lp(p, n)).catch(() => {})
+      }, 700)
+    }
+    const tables = ['incomes', 'expenses', 'bills', 'periods', 'budget_overrides', 'wallets', 'wallet_transfers',
+      'debts', 'debt_payments', 'categories', 'quick_templates', 'cashflow_members']
+    let ch = supabase.channel(`cf-${cfId}`)
+    for (const table of tables) {
+      ch = ch.on('postgres_changes', { event: '*', schema: 'public', table, filter: `cashflow_id=eq.${cfId}` }, refresh)
+    }
+    ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: 'cashflows', filter: `id=eq.${cfId}` }, refresh)
+    ch.subscribe()
+    return () => { clearTimeout(timer); supabase.removeChannel(ch) }
+  }, [cfId])
+
   const run = useCallback(async (fn) => {
     try {
       setError(null)
       return await fn()
     } catch (e) {
-      setError(e.message)
+      setError(e.code === '23P01' ? 'Tanggal periode bertumpuk dengan periode lain.' : e.message)
       throw e
     }
   }, [])
@@ -259,16 +288,58 @@ export function DataProvider({ children }) {
       }),
 
       // ----- periode -----
-      createPeriod: ({ start_date, end_date, firstIncome }) => run(async () => {
+      createPeriod: ({ start_date, end_date, firstIncome, rollover }) => run(async () => {
+        const clash = periods.find((p) => p.start_date <= end_date && p.end_date >= start_date)
+        if (clash) throw new Error(`Tanggal bertumpuk dengan periode ${fmtRange(clash.start_date, clash.end_date)}. Ubah dulu tanggal periode itu (ikon pensil).`)
         const prev = periods.find((p) => p.start_date < start_date)
         const created = must(await supabase.from('periods').insert(withCf({ start_date, end_date })).select().single())
         if (firstIncome?.amount) {
-          must(await supabase.from('incomes').insert(withCf({ period_id: created.id, name: firstIncome.name || 'Gaji', amount: firstIncome.amount, date: start_date })))
+          must(await supabase.from('incomes').insert(withCf({ period_id: created.id, name: firstIncome.name || 'Gaji', amount: firstIncome.amount, date: start_date, wallet_id: firstIncome.wallet_id ?? null })))
+        }
+        if (rollover > 0) {
+          must(await supabase.from('incomes').insert(withCf({ period_id: created.id, name: 'Sisa bulan lalu', amount: rollover, date: start_date, is_rollover: true })))
         }
         if (prev) await copyRecurring(prev, created)
         await loadPeriods(cfId)
         setSelectedId(created.id)
         return created
+      }),
+      updatePeriod: (id, { start_date, end_date }) => run(async () => {
+        if (end_date < start_date) throw new Error('Tanggal akhir harus setelah tanggal mulai.')
+        const clash = periods.find((p) => p.id !== id && p.start_date <= end_date && p.end_date >= start_date)
+        if (clash) throw new Error(`Tanggal bertumpuk dengan periode ${fmtRange(clash.start_date, clash.end_date)}.`)
+        must(await supabase.from('periods').update({ start_date, end_date }).eq('id', id))
+        await loadPeriods(cfId)
+        await reloadPeriod()
+      }),
+      /** Saldo akhir sebuah periode: dana masuk − tagihan dibayar − pengeluaran. */
+      periodSaldo: async (p) => {
+        const [i, b, e] = await Promise.all([
+          supabase.from('incomes').select('amount').eq('period_id', p.id),
+          supabase.from('bills').select('amount').eq('cashflow_id', cfId).eq('paid', true).gte('due_date', p.start_date).lte('due_date', p.end_date),
+          supabase.from('expenses').select('amount').eq('cashflow_id', cfId).gte('date', p.start_date).lte('date', p.end_date),
+        ])
+        const sum = (r) => must(r).reduce((a, x) => a + Number(x.amount), 0)
+        return sum(i) - sum(b) - sum(e)
+      },
+
+      // ----- template cepat -----
+      saveTemplate: (t) => run(async () => {
+        const { id, ...rest } = t
+        if (id) must(await supabase.from('quick_templates').update(rest).eq('id', id))
+        else must(await supabase.from('quick_templates').insert(withCf({ ...rest, sort: templates.length })))
+        await loadTemplates(cfId)
+      }),
+      deleteTemplate: (id) => run(async () => {
+        must(await supabase.from('quick_templates').delete().eq('id', id))
+        await loadTemplates(cfId)
+      }),
+      quickAdd: (t, date) => run(async () => {
+        const row = must(await supabase.from('expenses').insert(withCf({
+          amount: t.amount, category_id: t.category_id, wallet_id: t.wallet_id, note: t.label, date: date || today,
+        })).select().single())
+        await reloadPeriod()
+        return row
       }),
       deletePeriod: (id) => run(async () => {
         must(await supabase.from('periods').delete().eq('id', id))
@@ -408,8 +479,8 @@ export function DataProvider({ children }) {
         await loadWallets(cfId)
       }),
     }
-  }, [cfId, user.id, profile, cashflow, run, periods, period, today, categories.length, wallets.length,
-      loadAll, loadCashflowMeta, loadPeriods, loadDebts, loadCategories, loadWallets, reloadPeriod])
+  }, [cfId, user.id, profile, cashflow, run, periods, period, today, categories.length, wallets.length, templates.length,
+      loadAll, loadCashflowMeta, loadPeriods, loadDebts, loadCategories, loadWallets, loadTemplates, reloadPeriod])
 
   // ---------- turunan ----------
   const billsThis = useMemo(
@@ -457,7 +528,7 @@ export function DataProvider({ children }) {
     incomes, bills, billsThis, billsNext, overrides, expenses,
     plan, status, spentByDate, spentTotal, saldo,
     debts: debtsView,
-    wallets, walletById, balances, transfers, totalMoney,
+    wallets, walletById, balances, transfers, totalMoney, templates,
     ...actions,
   }
 

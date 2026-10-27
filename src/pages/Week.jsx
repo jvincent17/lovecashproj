@@ -57,7 +57,7 @@ export default function Week() {
           <span className="text-muted">Sisa <span className={`tabular font-medium ${week.amount - spent < 0 ? 'text-danger' : 'text-ink'}`}>{rupiah(week.amount - spent)}</span></span>
         </div>
         {week.overAllocated > 0 && (
-          <p className="text-xs text-danger mt-3">Jatah harian manual melebihi budget minggu ini sebesar {rupiah(week.overAllocated)}.</p>
+          <p className="text-xs text-danger mt-3 money">Jatah harian manual melebihi budget minggu ini sebesar {rupiah(week.overAllocated)}.</p>
         )}
       </section>
 
@@ -80,7 +80,7 @@ export default function Week() {
                     <span className={`tabular font-medium ${s.remaining < 0 ? 'text-danger' : ''}`}>{rupiah(s.remaining)}</span>
                   </div>
                   <Bar value={s.spent} max={Math.max(0, s.available)} className="mt-2" />
-                  <div className="flex justify-between text-xs text-muted mt-1.5">
+                  <div className="flex justify-between text-xs text-muted mt-1.5 money">
                     <span>Terpakai {rupiah(s.spent)}</span>
                     <span>{s.carryIn !== 0 && `${s.carryIn > 0 ? '+' : ''}${rupiah(s.carryIn)} dari kemarin`}</span>
                   </div>

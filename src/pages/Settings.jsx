@@ -5,6 +5,9 @@ import { useData } from '../context/DataContext.jsx'
 import Sheet from '../components/Sheet.jsx'
 import Avatar from '../components/Avatar.jsx'
 import CouplePhoto from '../components/CouplePhoto.jsx'
+import AmountInput from '../components/AmountInput.jsx'
+import WalletPicker from '../components/WalletPicker.jsx'
+import { rupiah } from '../lib/format.js'
 import { MODES, PALETTES, useTheme } from '../lib/theme.js'
 
 export default function Settings() {
@@ -12,6 +15,11 @@ export default function Settings() {
   const { profile, cashflow, members, myCashflows, categories,
     updateProfile, updateCashflow, regenerateCode, joinCashflow, switchCashflow, leaveCashflow } = useData()
   const [cat, setCat] = useState({ open: false, item: null })
+  const [tpl, setTpl] = useState({ open: false, item: null })
+  const { templates, catById, walletById } = useData()
+  useEffect(() => {
+    if (window.location.hash === '#template') document.getElementById('template')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
   const [joinOpen, setJoinOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -102,7 +110,31 @@ export default function Settings() {
             <li key={c.id}>
               <button onClick={() => setCat({ open: true, item: c })} className="w-full flex items-center gap-3 py-3 text-left">
                 <span className="size-9 rounded-xl bg-soft grid place-items-center">{c.icon}</span>
-                <span className="text-sm">{c.name}</span>
+                <span className="text-sm flex-1">{c.name}</span>
+                {c.monthly_limit && <span className="text-xs text-muted tabular">batas {rupiah(c.monthly_limit)}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section id="template" className="card p-5 scroll-mt-4">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold">Template catat cepat</h2>
+          <button onClick={() => setTpl({ open: true, item: null })} className="btn-ghost h-9 px-3"><Plus size={15} /> Tambah</button>
+        </div>
+        <p className="text-xs text-muted mb-2">Muncul di halaman Hari ini — sekali ketuk langsung tercatat.</p>
+        {templates.length === 0 && <p className="text-sm text-muted py-3 text-center">Belum ada template.</p>}
+        <ul className="divide-y divide-line">
+          {templates.map((t) => (
+            <li key={t.id}>
+              <button onClick={() => setTpl({ open: true, item: t })} className="w-full flex items-center gap-3 py-3 text-left">
+                <span className="size-9 rounded-xl bg-soft grid place-items-center">{catById[t.category_id]?.icon ?? '⚡'}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm truncate">{t.label}</span>
+                  <span className="block text-xs text-muted">{catById[t.category_id]?.name ?? 'Tanpa kategori'} · {t.wallet_id ? walletById[t.wallet_id]?.name ?? '-' : 'Unlocated Money'}</span>
+                </span>
+                <span className="text-sm tabular">{rupiah(t.amount)}</span>
               </button>
             </li>
           ))}
@@ -118,6 +150,7 @@ export default function Settings() {
       </section>
 
       <CategorySheet open={cat.open} item={cat.item} onClose={() => setCat({ open: false, item: null })} />
+      <TemplateSheet open={tpl.open} item={tpl.item} onClose={() => setTpl({ open: false, item: null })} />
       <JoinSheet open={joinOpen} onClose={() => setJoinOpen(false)} onJoin={joinCashflow} />
     </div>
   )
@@ -292,14 +325,15 @@ function CategorySheet({ open, item, onClose }) {
   const { saveCategory, deleteCategory } = useData()
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('📦')
+  const [limit, setLimit] = useState(0)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { if (open) { setName(item?.name ?? ''); setIcon(item?.icon ?? '📦') } }, [open, item])
+  useEffect(() => { if (open) { setName(item?.name ?? ''); setIcon(item?.icon ?? '📦'); setLimit(item?.monthly_limit ? Number(item.monthly_limit) : 0) } }, [open, item])
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
-    try { await saveCategory({ id: item?.id, name: name.trim(), icon }); onClose() } catch { /* */ } finally { setBusy(false) }
+    try { await saveCategory({ id: item?.id, name: name.trim(), icon, monthly_limit: limit || null }); onClose() } catch { /* */ } finally { setBusy(false) }
   }
   const remove = async () => {
     if (!confirm(`Hapus kategori "${item.name}"? Pengeluaran lama akan menjadi "Tanpa kategori".`)) return
@@ -314,6 +348,11 @@ function CategorySheet({ open, item, onClose }) {
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         </label>
         <div>
+          <span className="label">Batas per periode (opsional)</span>
+          <AmountInput value={limit} onChange={setLimit} placeholder="Tanpa batas" />
+          <span className="block text-xs text-muted mt-1.5">Ada peringatan saat pengeluaran kategori ini mencapai 80% atau lewat batas.</span>
+        </div>
+        <div>
           <span className="label">Ikon</span>
           <div className="grid grid-cols-10 gap-1">
             {EMOJI.map((em) => (
@@ -325,6 +364,57 @@ function CategorySheet({ open, item, onClose }) {
         <div className="flex gap-2">
           {item && <button type="button" disabled={busy} onClick={remove} className="btn-danger"><Trash2 size={16} /></button>}
           <button disabled={busy || !name.trim()} className="btn-primary flex-1">Simpan</button>
+        </div>
+      </form>
+    </Sheet>
+  )
+}
+
+function TemplateSheet({ open, item, onClose }) {
+  const { categories, saveTemplate, deleteTemplate } = useData()
+  const [label, setLabel] = useState('')
+  const [amount, setAmount] = useState(0)
+  const [categoryId, setCategoryId] = useState(null)
+  const [walletId, setWalletId] = useState(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    setLabel(item?.label ?? '')
+    setAmount(item ? Number(item.amount) : 0)
+    setCategoryId(item?.category_id ?? categories[0]?.id ?? null)
+    setWalletId(item?.wallet_id ?? null)
+  }, [open, item, categories])
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try { await saveTemplate({ id: item?.id, label: label.trim(), amount, category_id: categoryId, wallet_id: walletId }); onClose() } catch { /* */ } finally { setBusy(false) }
+  }
+  const remove = async () => {
+    setBusy(true)
+    try { await deleteTemplate(item.id); onClose() } catch { /* */ } finally { setBusy(false) }
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title={item ? 'Ubah template' : 'Template baru'}>
+      <form onSubmit={submit} className="space-y-4">
+        <label className="block"><span className="label">Nama</span>
+          <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus placeholder="cth. Kopi pagi, Bensin, Parkir" />
+        </label>
+        <div><span className="label">Nominal</span><AmountInput value={amount} onChange={setAmount} /></div>
+        <div>
+          <span className="label">Kategori</span>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <button type="button" key={c.id} onClick={() => setCategoryId(c.id)}
+                className={`chip ${categoryId === c.id ? 'border-accent bg-accent-soft text-accent' : 'text-ink'}`}>
+                <span>{c.icon}</span>{c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <WalletPicker label="Bayar dari" value={walletId} onChange={setWalletId} showBalance={false} />
+        <div className="flex gap-2">
+          {item && <button type="button" disabled={busy} onClick={remove} className="btn-danger"><Trash2 size={16} /></button>}
+          <button disabled={busy || !label.trim() || !amount} className="btn-primary flex-1">Simpan</button>
         </div>
       </form>
     </Sheet>
