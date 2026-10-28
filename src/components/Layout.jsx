@@ -10,6 +10,7 @@ import { usePrivacy } from '../lib/privacy.js'
 import Avatar from './Avatar.jsx'
 import CouplePhoto from './CouplePhoto.jsx'
 import Sheet from './Sheet.jsx'
+import { hideSplash } from '../lib/splash.js'
 
 const MAIN = [
   { to: '/', label: 'Hari ini', icon: Sun, end: true },
@@ -38,6 +39,7 @@ function useOnline() {
 
 export default function Layout() {
   const { ready, error, clearError, profile } = useData()
+  useEffect(() => { if (ready) hideSplash() }, [ready])
   const [hello, setHello] = useState(greeting())
   const [privacy, togglePrivacy] = usePrivacy()
   const [moreOpen, setMoreOpen] = useState(false)

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { hideSplash } from '../lib/splash.js'
 
 export default function Login() {
+  useEffect(() => { hideSplash() }, [])
   const [mode, setMode] = useState('login')
   const [ident, setIdent] = useState('') // username atau email (masuk)
   const [email, setEmail] = useState('')

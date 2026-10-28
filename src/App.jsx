@@ -38,6 +38,7 @@ function Gate() {
 
 export default function App() {
   if (!isConfigured) {
+    window.__hideSplash?.()
     return (
       <div className="min-h-dvh grid place-items-center p-6">
         <div className="card p-6 max-w-md text-sm space-y-2">

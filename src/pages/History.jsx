@@ -86,7 +86,7 @@ export default function History() {
       <div className="flex gap-2">
         <label className="flex-1 flex items-center gap-2 input">
           <Search size={16} className="text-muted shrink-0" />
-          <input className="flex-1 bg-transparent outline-none" placeholder="Cari catatan, kategori, nominal…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="flex-1 min-w-0 bg-transparent outline-none text-base md:text-sm" placeholder="Cari catatan, kategori, nominal…" value={q} onChange={(e) => setQ(e.target.value)} />
           {q && <button onClick={() => setQ('')} aria-label="Hapus pencarian"><X size={15} className="text-muted" /></button>}
         </label>
         <button onClick={() => setShowFilter((v) => !v)} className={`btn-ghost px-3 relative ${showFilter ? 'bg-accent-soft text-accent' : ''}`} aria-label="Filter">

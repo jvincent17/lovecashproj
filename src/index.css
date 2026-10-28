@@ -109,7 +109,7 @@ body { -webkit-tap-highlight-color: transparent; }
 @utility btn-primary { @apply btn text-on-accent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
 @utility btn-ghost { @apply btn bg-soft text-ink; }
 @utility btn-danger { @apply btn bg-danger-soft text-danger; }
-@utility input { @apply w-full h-11 rounded-2xl border border-line bg-card px-3 text-sm outline-none focus:border-accent; }
+@utility input { @apply w-full h-11 rounded-2xl border border-line bg-card px-3 text-base md:text-sm outline-none focus:border-accent; }
 @utility label { @apply block text-xs font-medium text-muted mb-1.5; }
 @utility chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 h-9 text-sm transition; }
 

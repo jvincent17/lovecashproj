@@ -11,7 +11,7 @@ export default function AmountInput({ value, onChange, big = false, autoFocus, p
         placeholder={placeholder}
         value={value ? formatAmountInput(String(value)) : ''}
         onChange={(e) => onChange(parseAmount(e.target.value))}
-        className={`w-full bg-transparent outline-none tabular ${big ? 'text-3xl font-semibold' : 'text-sm'}`}
+        className={`w-full bg-transparent outline-none tabular ${big ? 'text-3xl font-semibold' : 'text-base md:text-sm'}`}
         {...rest}
       />
     </div>
