@@ -1,5 +1,5 @@
 /* Duit Kara service worker: aplikasi tetap terbuka saat sinyal jelek, data terakhir tetap tampil. */
-const VERSION = 'dk-v1'
+const VERSION = 'dk-v2'
 const SHELL = `${VERSION}-shell`
 const DATA = `${VERSION}-data`
 
