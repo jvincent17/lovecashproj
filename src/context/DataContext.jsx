@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { addDays, addMonths, cycleFor, fmtRange, todayISO } from '../lib/dates.js'
-import { computePlan, dailyStatus, sumBy } from '../lib/budget.js'
+import { computePlan, dailyStatus, periodSaldo as calcSaldo, sumBy } from '../lib/budget.js'
 import { useAuth } from './AuthContext.jsx'
 import { removePhoto, uploadPhoto } from '../lib/photos.js'
 
@@ -20,6 +20,10 @@ const nowIso = () => new Date().toISOString()
 // Urutan sama seperti query di server
 const byExpenseOrder = (a, b) => (a.date === b.date ? (a.created_at < b.created_at ? 1 : -1) : a.date < b.date ? 1 : -1)
 const byDateAsc = (k) => (a, b) => (a[k] === b[k] ? (a.created_at < b.created_at ? -1 : 1) : a[k] < b[k] ? -1 : 1)
+
+const statsMap = (rows) => Object.fromEntries((rows || []).map((r) => [r.pocket_id, {
+  allIn: Number(r.all_in) || 0, allOut: Number(r.all_out) || 0, perIn: Number(r.per_in) || 0, perOut: Number(r.per_out) || 0,
+}]))
 
 const CACHE_KEY = (uid) => `duitkara-cache-v1-${uid}`
 const readCache = (uid) => { try { return JSON.parse(localStorage.getItem(CACHE_KEY(uid)) || 'null') } catch { return null } }
@@ -44,6 +48,9 @@ export function DataProvider({ children }) {
   const [balances, setBalances] = useState({}) // wallet_id ('' = Unlocated) -> saldo
   const [transfers, setTransfers] = useState([])
   const [templates, setTemplates] = useState([])
+  const [pockets, setPockets] = useState([])
+  const [pocketMoves, setPocketMoves] = useState([])
+  const [pocketStats, setPocketStats] = useState({}) // pocket_id -> { allIn, allOut, perIn, perOut }
 
   const [selectedId, setSelectedId] = useState(null)
   const [incomes, setIncomes] = useState([])
@@ -65,6 +72,8 @@ export function DataProvider({ children }) {
   // ref untuk dipakai di callback async tanpa memicu ulang effect
   const selRef = useRef(null)
   selRef.current = selectedId
+  const periodRef = useRef(null)
+  periodRef.current = period
   const loadedKeyRef = useRef('') // periode (id+tanggal) yang datanya sedang ada di state
   const keyOf = (p) => (p ? `${p.id}|${p.start_date}|${p.end_date}` : '')
   const recentIds = useRef(new Map()) // id yang baru kita ubah sendiri -> waktu (untuk abaikan gema realtime)
@@ -91,6 +100,9 @@ export function DataProvider({ children }) {
     setBills(d.bills)
     setOverrides(d.overrides)
     setExpenses(d.expenses)
+    setPockets(d.pockets || [])
+    setPocketMoves(d.pocket_moves || [])
+    setPocketStats(statsMap(d.pocket_stats))
   }, [])
 
   /** Satu permintaan untuk semua data (cashflow aktif + periode terpilih). */
@@ -122,8 +134,8 @@ export function DataProvider({ children }) {
 
   /** Data satu periode (saat pindah periode). Empat query paralel = satu kali tunggu. */
   const loadPeriodData = useCallback(async (p) => {
-    if (!p) { setIncomes([]); setBills([]); setOverrides([]); setExpenses([]); return }
-    const [i, b, o, e] = await Promise.all([
+    if (!p) { setIncomes([]); setBills([]); setOverrides([]); setExpenses([]); setPocketMoves([]); return }
+    const [i, b, o, e, pm, ps] = await Promise.all([
       supabase.from('incomes').select('*').eq('period_id', p.id).order('date').order('created_at'),
       supabase.from('bills').select('*').eq('cashflow_id', p.cashflow_id)
         .gte('due_date', p.start_date).lte('due_date', addDays(p.end_date, 62)).order('due_date').order('created_at'),
@@ -131,11 +143,15 @@ export function DataProvider({ children }) {
       supabase.from('expenses').select('*').eq('cashflow_id', p.cashflow_id)
         .gte('date', p.start_date).lte('date', p.end_date)
         .order('date', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('pocket_moves').select('*').eq('period_id', p.id).order('date').order('created_at'),
+      supabase.rpc('pocket_stats', { cf: p.cashflow_id, pid: p.id }),
     ])
     setIncomes(must(i))
     setBills(must(b))
     setOverrides(must(o))
     setExpenses(must(e))
+    if (!pm.error) setPocketMoves(pm.data)
+    if (!ps.error) setPocketStats(statsMap(ps.data))
   }, [])
 
   // Pindah periode / tanggal periode berubah -> muat datanya (kalau belum ada)
@@ -156,6 +172,17 @@ export function DataProvider({ children }) {
     clearTimeout(balTimer.current)
     balTimer.current = setTimeout(() => { if (cfId) loadBalances(cfId).catch(() => {}) }, 1500)
   }, [cfId, loadBalances])
+
+  const pkTimer = useRef(null)
+  const reconcilePockets = useCallback(() => {
+    clearTimeout(pkTimer.current)
+    pkTimer.current = setTimeout(async () => {
+      const p = periodRef.current
+      if (!p) return
+      const r = await supabase.rpc('pocket_stats', { cf: p.cashflow_id, pid: p.id })
+      if (!r.error) setPocketStats(statsMap(r.data))
+    }, 1500)
+  }, [])
 
   // Muat ulang saat aplikasi dibuka lagi
   useEffect(() => {
@@ -178,7 +205,7 @@ export function DataProvider({ children }) {
       timer = setTimeout(() => refreshAll().catch(() => {}), 600)
     }
     const tables = ['incomes', 'expenses', 'bills', 'periods', 'budget_overrides', 'wallets', 'wallet_transfers',
-      'debts', 'debt_payments', 'categories', 'quick_templates', 'cashflow_members']
+      'debts', 'debt_payments', 'categories', 'quick_templates', 'cashflow_members', 'pockets', 'pocket_moves']
     let ch = supabase.channel(`cf-${cfId}`)
     for (const table of tables) {
       ch = ch.on('postgres_changes', { event: '*', schema: 'public', table, filter: `cashflow_id=eq.${cfId}` }, onChange)
@@ -311,6 +338,22 @@ export function DataProvider({ children }) {
       if (after) bump(after.wallet_id, sign * Number(after.amount))
       reconcileBalances()
     }
+    // efek pengeluaran kantong ke statistik kantong
+    const bumpPocket = (pocketId, field, delta, date) => {
+      if (!pocketId || !delta) return
+      setPocketStats((m) => {
+        const cur = m[pocketId] || { allIn: 0, allOut: 0, perIn: 0, perOut: 0 }
+        const next = { ...cur, [`all${field}`]: cur[`all${field}`] + delta }
+        if (date == null || inPeriod(date)) next[`per${field}`] = cur[`per${field}`] + delta
+        return { ...m, [pocketId]: next }
+      })
+    }
+    const expenseEffect = (before, after) => {
+      moneyEffect(-1)(before, after)
+      if (before?.pocket_id) bumpPocket(before.pocket_id, 'Out', -Number(before.amount), before.date)
+      if (after?.pocket_id) bumpPocket(after.pocket_id, 'Out', Number(after.amount), after.date)
+      if (before?.pocket_id || after?.pocket_id) reconcilePockets()
+    }
 
     return {
       clearError: () => setError(null),
@@ -383,7 +426,7 @@ export function DataProvider({ children }) {
       }),
 
       // ----- periode -----
-      createPeriod: ({ start_date, end_date, firstIncome, rollover }) => run(async () => {
+      createPeriod: ({ start_date, end_date, firstIncome, rollover, pocketFunds = [] }) => run(async () => {
         const clash = periods.find((p) => p.start_date <= end_date && p.end_date >= start_date)
         if (clash) throw new Error(`Tanggal bertumpuk dengan periode ${fmtRange(clash.start_date, clash.end_date)}. Ubah dulu tanggal periode itu (ikon pensil).`)
         const prev = periods.find((p) => p.start_date < start_date)
@@ -395,8 +438,11 @@ export function DataProvider({ children }) {
         if (rollover > 0) {
           inserts.push(withCf({ period_id: created.id, name: 'Sisa bulan lalu', amount: rollover, date: start_date, is_rollover: true }))
         }
+        const funds = pocketFunds.filter((f) => f.amount > 0)
+          .map((f) => withCf({ pocket_id: f.pocket_id, period_id: created.id, kind: 'fund', amount: f.amount, date: start_date }))
         await Promise.all([
           inserts.length ? supabase.from('incomes').insert(inserts).then(must) : null,
+          funds.length ? supabase.from('pocket_moves').insert(funds).then(must) : null,
           prev ? copyRecurring(prev, created) : null,
         ])
         selRef.current = created.id
@@ -418,6 +464,8 @@ export function DataProvider({ children }) {
       }),
       /** Saldo akhir sebuah periode: dana masuk − tagihan dibayar − pengeluaran. */
       periodSaldo: async (p) => {
+        const r = await supabase.rpc('period_saldo', { pid: p.id })
+        if (!r.error && r.data != null) return Number(r.data)
         const [i, b, e] = await Promise.all([
           supabase.from('incomes').select('amount').eq('period_id', p.id),
           supabase.from('bills').select('amount').eq('cashflow_id', cfId).eq('paid', true).gte('due_date', p.start_date).lte('due_date', p.end_date),
@@ -433,23 +481,60 @@ export function DataProvider({ children }) {
         if (!exp.id && !inPeriod(exp.date)) {
           return run(async () => {
             const s = must(await supabase.from('expenses').insert(withCf(exp)).select().single())
-            markMine(s.id); bump(s.wallet_id, -Number(s.amount)); reconcileBalances()
+            markMine(s.id); bump(s.wallet_id, -Number(s.amount)); reconcileBalances(); if (s.pocket_id) { bumpPocket(s.pocket_id, 'Out', Number(s.amount), s.date); reconcilePockets() }
             return s
           })
         }
         return saveRow({
           table: 'expenses', setList: setExpenses, row: exp, sort: byExpenseOrder,
-          onLocal: (before, after) => moneyEffect(-1)(before, after),
+          onLocal: expenseEffect,
         })
       },
       deleteExpense: (id) => deleteRow({
         table: 'expenses', setList: setExpenses, id,
-        onLocal: (before) => before && moneyEffect(-1)(before, null),
+        onLocal: (before) => before && expenseEffect(before, null),
       }),
       quickAdd: (t, date) => saveRow({
         table: 'expenses', setList: setExpenses, sort: byExpenseOrder,
         row: { amount: t.amount, category_id: t.category_id, wallet_id: t.wallet_id, note: t.label, date: date || today },
-        onLocal: (before, after) => moneyEffect(-1)(before, after),
+        onLocal: expenseEffect,
+      }),
+
+      // ----- kantong khusus -----
+      savePocket: ({ fundNow = 0, ...pocket }) => run(async () => {
+        const { id, ...rest } = pocket
+        if (id) {
+          must(await supabase.from('pockets').update(rest).eq('id', id))
+          markMine(id)
+          setPockets((l) => l.map((k) => (k.id === id ? { ...k, ...rest } : k)))
+          return
+        }
+        const saved = must(await supabase.from('pockets').insert(withCf({ ...rest, sort: pockets.length })).select().single())
+        markMine(saved.id)
+        setPockets((l) => [...l, saved])
+        setPocketStats((m) => ({ ...m, [saved.id]: { allIn: 0, allOut: 0, perIn: 0, perOut: 0 } }))
+        if (fundNow > 0 && period) {
+          const mv = must(await supabase.from('pocket_moves').insert(withCf({
+            pocket_id: saved.id, period_id: period.id, kind: 'fund', amount: fundNow, date: today,
+          })).select().single())
+          markMine(mv.id)
+          setPocketMoves((l) => [...l, mv])
+          setPocketStats((m) => ({ ...m, [saved.id]: { allIn: fundNow, allOut: 0, perIn: fundNow, perOut: 0 } }))
+        }
+      }),
+      deletePocket: (id) => run(async () => {
+        must(await supabase.from('pockets').delete().eq('id', id))
+        await refreshAll() // pengeluaran kantong ini kembali dihitung sebagai pengeluaran harian
+      }),
+      /** kind: 'fund' (dari dana bulan ini) | 'from_week' (tarik dari jatah minggu) | 'to_day' (ke jatah hari) */
+      addPocketMove: (mv) => saveRow({
+        table: 'pocket_moves', setList: setPocketMoves, sort: byDateAsc('date'),
+        row: { ...mv, period_id: period.id },
+        onLocal: (_b, after) => { bumpPocket(after.pocket_id, 'In', (after.kind === 'to_day' ? -1 : 1) * Number(after.amount), null); reconcilePockets() },
+      }),
+      deletePocketMove: (id) => deleteRow({
+        table: 'pocket_moves', setList: setPocketMoves, id,
+        onLocal: (before) => { if (before) { bumpPocket(before.pocket_id, 'In', (before.kind === 'to_day' ? 1 : -1) * Number(before.amount), null); reconcilePockets() } },
       }),
 
       // ----- dana masuk (instan) -----
@@ -612,7 +697,7 @@ export function DataProvider({ children }) {
       }),
     }
   }, [cfId, user.id, profile, cashflow, run, instant, bump, reconcileBalances, refreshAll, periods, period, today,
-      categories.length, wallets.length, templates.length])
+      categories.length, wallets.length, templates.length, pockets.length, reconcilePockets])
 
   // ---------- turunan ----------
   const billsThis = useMemo(
@@ -624,17 +709,25 @@ export function DataProvider({ children }) {
     [bills, nextRange],
   )
   const plan = useMemo(
-    () => (period ? computePlan({ period, incomes, bills: billsThis, overrides }) : null),
-    [period, incomes, billsThis, overrides],
+    () => (period ? computePlan({ period, incomes, bills: billsThis, overrides, pocketMoves }) : null),
+    [period, incomes, billsThis, overrides, pocketMoves],
   )
-  const spentByDate = useMemo(() => sumBy(expenses, (e) => e.date), [expenses])
+  // Pengeluaran dari kantong tidak mengurangi jatah harian
+  const dailyExpenses = useMemo(() => expenses.filter((e) => !e.pocket_id), [expenses])
+  const spentByDate = useMemo(() => sumBy(dailyExpenses, (e) => e.date), [dailyExpenses])
   const status = useMemo(
     () => (plan ? dailyStatus(plan, spentByDate, period.start_date, period.end_date, today) : {}),
     [plan, spentByDate, period, today],
   )
-  const spentTotal = useMemo(() => expenses.reduce((a, e) => a + Number(e.amount), 0), [expenses])
+  const spentTotal = useMemo(() => dailyExpenses.reduce((a, e) => a + Number(e.amount), 0), [dailyExpenses])
   /** Saldo = pemasukan − tagihan yang sudah dibayar − pengeluaran */
-  const saldo = plan ? plan.income - plan.billsPaid - spentTotal : 0
+  const saldo = plan ? calcSaldo({ plan, expenses, pockets, pocketMoves }) : 0
+  const pocketsView = useMemo(() => pockets.map((k) => {
+    const st = pocketStats[k.id] || { allIn: 0, allOut: 0, perIn: 0, perOut: 0 }
+    const balance = k.carry_over ? st.allIn - st.allOut : st.perIn - st.perOut
+    return { ...k, ...st, balance }
+  }), [pockets, pocketStats])
+  const pocketById = useMemo(() => Object.fromEntries(pocketsView.map((k) => [k.id, k])), [pocketsView])
 
   const catById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
   const memberName = useCallback((uid) => {
@@ -661,6 +754,7 @@ export function DataProvider({ children }) {
     plan, status, spentByDate, spentTotal, saldo,
     debts: debtsView,
     wallets, walletById, balances, transfers, totalMoney, templates,
+    pockets: pocketsView, pocketById, pocketMoves, dailyExpenses,
     ...actions,
   }
 

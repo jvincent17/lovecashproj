@@ -9,6 +9,7 @@ import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
 import Bar from '../components/Bar.jsx'
 import WalletPicker from '../components/WalletPicker.jsx'
 import { exportPeriod } from '../lib/exportXlsx.js'
+import { PocketSection } from '../components/Pockets.jsx'
 
 const KIND = {
   bill: { label: 'Tagihan', cls: 'bg-soft text-muted' },
@@ -18,7 +19,7 @@ const KIND = {
 
 export default function Month() {
   const { period, periods, plan, incomes, billsThis, billsNext, nextRange, expenses, saldo, spentTotal,
-    selectPeriod, deletePeriod, memberName, members, catById, walletById } = useData()
+    selectPeriod, deletePeriod, memberName, members, catById, walletById, pockets, pocketById } = useData()
   const [newPeriod, setNewPeriod] = useState(false)
   const [editPeriod, setEditPeriod] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -77,10 +78,14 @@ export default function Month() {
         </div>
         <dl className="mt-5 space-y-2 text-sm max-w-xs">
           <Row label="Tagihan bulan ini" value={`-${rupiah(plan.billsTotal)}`} />
-          <Row label="Budget harian/mingguan" value={rupiah(plan.flexible)} bold />
+          {plan.pocketFund > 0 && <Row label="Ke kantong khusus" value={`-${rupiah(plan.pocketFund)}`} />}
+          {plan.pocketFromWeek - plan.pocketToDay !== 0 && (
+            <Row label="Kantong ⇄ jatah" value={`${plan.pocketToDay - plan.pocketFromWeek > 0 ? '+' : '-'}${rupiah(Math.abs(plan.pocketToDay - plan.pocketFromWeek))}`} />
+          )}
+          <Row label="Budget harian/mingguan" value={rupiah(plan.dailyBudget)} bold />
           <Row label="Sudah terpakai" value={rupiah(spentTotal)} />
         </dl>
-        <Bar value={spentTotal} max={plan.flexible} className="mt-3 max-w-xs" />
+        <Bar value={spentTotal} max={Math.max(0, plan.dailyBudget)} className="mt-3 max-w-xs" />
         {plan.billsTotal > plan.income && (
           <p className="text-xs text-danger mt-3 money">Tagihan melebihi dana bulan ini sebesar {rupiah(plan.billsTotal - plan.income)}.</p>
         )}
@@ -116,6 +121,8 @@ export default function Month() {
           </div>
         )}
       </section>
+
+      <PocketSection />
 
       {/* Tagihan */}
       <section className="card p-5">
@@ -169,7 +176,7 @@ export default function Month() {
       <button disabled={exporting}
         onClick={async () => {
           setExporting(true)
-          try { await exportPeriod({ period, plan, saldo, spentTotal, incomes, bills: billsThis, expenses, catById, walletById, memberName }) }
+          try { await exportPeriod({ period, plan, saldo, spentTotal, incomes, bills: billsThis, expenses, catById, walletById, memberName, pocketById, pockets }) }
           finally { setExporting(false) }
         }}
         className="btn-ghost w-full">
@@ -225,7 +232,7 @@ function BillRow({ b, onEdit }) {
 }
 
 function PeriodForm({ onDone }) {
-  const { payday, periods, today, createPeriod, periodSaldo } = useData()
+  const { payday, periods, today, createPeriod, periodSaldo, pockets } = useData()
   const latest = periods[0]
   const def = latest && latest.end_date >= today
     ? (() => { const s = addDays(latest.end_date, 1); return { start: s, end: cycleFor(s, payday).end } })()
@@ -239,6 +246,7 @@ function PeriodForm({ onDone }) {
   const [carry, setCarry] = useState(true)
   const [prevSaldo, setPrevSaldo] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [funds, setFunds] = useState(() => Object.fromEntries(pockets.map((k) => [k.id, Number(k.default_amount) || 0])))
 
   const prev = periods.find((p) => p.start_date < start)
   useEffect(() => {
@@ -256,6 +264,7 @@ function PeriodForm({ onDone }) {
         start_date: start, end_date: end,
         firstIncome: { name, amount, wallet_id: walletId },
         rollover: carry && prevSaldo > 0 ? prevSaldo : 0,
+        pocketFunds: pockets.map((k) => ({ pocket_id: k.id, amount: Number(funds[k.id]) || 0 })),
       })
       onDone()
     } catch { /* */ } finally { setBusy(false) }
@@ -297,6 +306,21 @@ function PeriodForm({ onDone }) {
             Periode lalu minus {rupiah(-prevSaldo)}, jadi tidak ada sisa yang dibawa.
           </p>
         ) : null
+      )}
+
+      {pockets.length > 0 && (
+        <div>
+          <span className="label">Sisihkan ke kantong khusus</span>
+          <div className="space-y-2">
+            {pockets.map((k) => (
+              <div key={k.id} className="grid grid-cols-[1fr_1.4fr] gap-2 items-center">
+                <span className="text-sm truncate">{k.icon} {k.name}</span>
+                <AmountInput value={funds[k.id] ?? 0} onChange={(v) => setFunds((f) => ({ ...f, [k.id]: v }))} placeholder="0" />
+              </div>
+            ))}
+          </div>
+          <span className="block text-xs text-muted mt-1.5">Diambil dari dana periode ini, di luar jatah harian. Isi 0 untuk lewati.</span>
+        </div>
       )}
 
       <p className="text-xs text-muted">

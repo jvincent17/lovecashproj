@@ -65,17 +65,33 @@ export function dayWeights(period, incomes, billsTotal) {
   return w
 }
 
+/** Bagi `total` (bulat) ke daftar hari sesuai bobot, metode sisa terbesar. */
+function splitBy(days, total, weightOf) {
+  const W = days.reduce((a, d) => a + Math.max(0, weightOf(d)), 0)
+  const exact = days.map((d) => total * (W > 0 ? Math.max(0, weightOf(d)) / W : 1 / days.length))
+  const base = exact.map((x) => Math.floor(x + 1e-6))
+  let left = total - base.reduce((a, b) => a + b, 0)
+  const order = exact.map((x, i) => [x - base[i], i]).sort((a, b) => b[0] - a[0])
+  for (let k = 0; left > 0 && days.length; k = (k + 1) % days.length, left--) base[order[k][1]] += 1
+  return Object.fromEntries(days.map((d, i) => [d, base[i]]))
+}
+
 /**
  * Susun rencana budget lengkap untuk satu periode.
  * incomes: dana masuk periode ini; bills: tagihan yang jatuh tempo di periode ini.
- * Budget fleksibel = total dana masuk − semua tagihan (dicentang maupun belum).
+ * pocketMoves: pergerakan kantong khusus di periode ini (fund / from_week / to_day).
+ * Budget fleksibel = dana masuk − semua tagihan − uang yang disisihkan ke kantong (fund).
  */
-export function computePlan({ period, incomes = [], bills = [], overrides = [] }) {
+export function computePlan({ period, incomes = [], bills = [], overrides = [], pocketMoves = [] }) {
   const income = incomes.reduce((s, i) => s + Number(i.amount), 0)
   const billsTotal = bills.reduce((s, b) => s + Number(b.amount), 0)
   const billsPaid = bills.filter((b) => b.paid).reduce((s, b) => s + Number(b.amount), 0)
-  const flexible = Math.max(0, income - billsTotal)
-  const w = dayWeights(period, incomes, billsTotal)
+  const sumKind = (k) => pocketMoves.filter((m) => m.kind === k).reduce((s, m) => s + Number(m.amount), 0)
+  const pocketFund = sumKind('fund')
+  const pocketFromWeek = sumKind('from_week')
+  const pocketToDay = sumKind('to_day')
+  const flexible = Math.max(0, income - billsTotal - pocketFund)
+  const w = dayWeights(period, incomes, billsTotal + pocketFund)
 
   const weekOv = {}
   const dayOv = {}
@@ -88,30 +104,69 @@ export function computePlan({ period, incomes = [], bills = [], overrides = [] }
   const wAlloc = allocate(weeks.map((wk) => ({ key: wk.index, weight: wk.days.reduce((a, d) => a + w[d], 0) })), flexible, weekOv)
 
   const dayAlloc = {}
-  const outWeeks = weeks.map((wk) => {
-    const amount = wAlloc.amounts[wk.index]
+  const dayOverAlloc = {}
+  weeks.forEach((wk) => {
     const dOv = {}
     wk.days.forEach((d) => { if (dayOv[d] != null) dOv[d] = dayOv[d] })
-    const dA = allocate(wk.days.map((d) => ({ key: d, weight: w[d] })), amount, dOv)
+    const dA = allocate(wk.days.map((d) => ({ key: d, weight: w[d] })), wAlloc.amounts[wk.index], dOv)
     wk.days.forEach((d) => { dayAlloc[d] = dA.amounts[d] })
-    return {
-      ...wk,
-      amount,
-      isCustom: weekOv[wk.index] != null,
-      overAllocated: dA.overAllocated,
-      days: wk.days.map((d) => ({ date: d, amount: dA.amounts[d], isCustom: dayOv[d] != null })),
-    }
+    dayOverAlloc[wk.index] = dA.overAllocated
   })
+
+  // Kantong: tarik dari jatah minggu (hari-hari mulai tanggal tarik, di minggu yang sama) & masukkan ke jatah hari
+  const pocketDay = {} // efek kantong per hari (untuk keterangan di UI)
+  const clampDay = (d) => (d < period.start_date ? period.start_date : d > period.end_date ? period.end_date : d)
+  for (const m of pocketMoves) {
+    const amt = Number(m.amount)
+    const date = clampDay(m.date)
+    if (m.kind === 'to_day') {
+      dayAlloc[date] = (dayAlloc[date] || 0) + amt
+      pocketDay[date] = (pocketDay[date] || 0) + amt
+    } else if (m.kind === 'from_week') {
+      const wk = weeks.find((x) => x.days.includes(date))
+      const targets = wk ? wk.days.filter((d) => d >= date) : [date]
+      const cut = splitBy(targets, amt, (d) => dayAlloc[d])
+      for (const d of targets) {
+        dayAlloc[d] -= cut[d]
+        pocketDay[d] = (pocketDay[d] || 0) - cut[d]
+      }
+    }
+  }
+
+  const outWeeks = weeks.map((wk) => ({
+    ...wk,
+    amount: wk.days.reduce((a, d) => a + dayAlloc[d], 0),
+    isCustom: weekOv[wk.index] != null,
+    overAllocated: dayOverAlloc[wk.index],
+    days: wk.days.map((d) => ({ date: d, amount: dayAlloc[d], isCustom: dayOv[d] != null, pocket: pocketDay[d] || 0 })),
+  }))
 
   return {
     income,
     billsTotal,
     billsPaid,
+    pocketFund,
+    pocketFromWeek,
+    pocketToDay,
     flexible,
+    /** Total yang benar-benar dibagi ke jatah harian */
+    dailyBudget: flexible - pocketFromWeek + pocketToDay,
     overAllocated: wAlloc.overAllocated,
     weeks: outWeeks,
     dayAlloc,
   }
+}
+
+/**
+ * Saldo periode = dana masuk − tagihan dibayar − pengeluaran harian − pengeluaran kantong biasa
+ *                 − uang bersih yang masuk ke kantong "numpuk" (dianggap sudah ditabung).
+ */
+export function periodSaldo({ plan, expenses = [], pockets = [], pocketMoves = [] }) {
+  const carry = new Set(pockets.filter((k) => k.carry_over).map((k) => k.id))
+  const spent = expenses.filter((e) => !e.pocket_id || !carry.has(e.pocket_id)).reduce((a, e) => a + Number(e.amount), 0)
+  const toCarry = pocketMoves.filter((m) => carry.has(m.pocket_id))
+    .reduce((a, m) => a + (m.kind === 'to_day' ? -1 : 1) * Number(m.amount), 0)
+  return plan.income - plan.billsPaid - spent - toCarry
 }
 
 /**

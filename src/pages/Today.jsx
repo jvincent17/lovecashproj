@@ -14,13 +14,15 @@ import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
 import { IncomeSheet } from './Month.jsx'
 import Reminders from '../components/Reminders.jsx'
 import QuickTemplates from '../components/QuickTemplates.jsx'
+import { PocketMoveSheet } from '../components/Pockets.jsx'
 
 export default function Today() {
-  const { period, periods, plan, status, expenses, today, saldo, spentTotal, selectPeriod, profile } = useData()
+  const { period, periods, plan, status, expenses, dailyExpenses, pockets, today, saldo, spentTotal, selectPeriod, profile } = useData()
   const [day, setDay] = useState(today)
   const [sheet, setSheet] = useState({ open: false, expense: null })
   const [editJatah, setEditJatah] = useState(false)
   const [addIncome, setAddIncome] = useState(false)
+  const [pocketSheet, setPocketSheet] = useState({ open: false, pocket: null, kind: 'to_day' })
 
   // Shortcut dari ikon aplikasi: /?catat=1 langsung membuka form catat
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function Today() {
   const week = plan.weeks.find((w) => w.start <= day && w.end >= day)
   const dayInfo = week.days.find((d) => d.date === day)
   const jatahLeft = s.alloc - s.spent
-  const weekSpent = expenses.filter((e) => e.date >= week.start && e.date <= week.end).reduce((a, e) => a + Number(e.amount), 0)
+  const weekSpent = dailyExpenses.filter((e) => e.date >= week.start && e.date <= week.end).reduce((a, e) => a + Number(e.amount), 0)
   const dayItems = expenses.filter((e) => e.date === day)
   const isToday = day === today
   const canPrev = day > period.start_date
@@ -87,6 +89,8 @@ export default function Today() {
           {s.spent > 0 ? `sisa dari jatah ${rupiah(s.alloc)} · terpakai ${rupiah(s.spent)}` : 'belum ada pengeluaran'}
           {s.adjust < 0 && <span className="block text-danger">jatah dipotong {rupiah(-s.adjust)} dari minus hari sebelumnya</span>}
           {s.adjust > 0 && <span className="block text-accent">jatah ditambah {rupiah(s.adjust)} dari sisa hari sebelumnya</span>}
+          {dayInfo?.pocket > 0 && <span className="block text-accent">termasuk +{rupiah(dayInfo.pocket)} dari kantong khusus</span>}
+          {dayInfo?.pocket < 0 && <span className="block">sudah disisihkan {rupiah(-dayInfo.pocket)} ke kantong khusus</span>}
         </p>
         <Bar value={s.spent} max={Math.max(0, s.alloc)} className="mt-4" />
         <dl className="grid grid-cols-3 gap-2 mt-4 text-sm">
@@ -116,8 +120,23 @@ export default function Today() {
       <div className="grid grid-cols-3 gap-3">
         <MiniStat label="Saldo" value={saldo} hint="uang di tangan" />
         <MiniStat label="Sisa minggu" value={week.amount - weekSpent} hint={`dari ${rupiah(week.amount)}`} />
-        <MiniStat label="Sisa budget" value={plan.flexible - spentTotal} hint="bulan ini" />
+        <MiniStat label="Sisa budget" value={plan.dailyBudget - spentTotal} hint="bulan ini" />
       </div>
+
+      {pockets.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+          {pockets.map((k) => (
+            <button key={k.id} onClick={() => setPocketSheet({ open: true, pocket: k, kind: 'to_day' })}
+              className="shrink-0 card flex items-center gap-2 px-3 py-2 text-left hover:border-accent transition">
+              <span className="text-lg">{k.icon}</span>
+              <span className="leading-tight">
+                <span className="block text-xs">{k.name}</span>
+                <span className={`block text-sm font-semibold tabular ${k.balance < 0 ? 'text-danger' : ''}`}>{rupiah(k.balance)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <button onClick={() => setAddIncome(true)}
         className="w-full card px-4 py-3 flex items-center gap-3 text-left hover:border-accent transition">
@@ -153,6 +172,8 @@ export default function Today() {
 
       <ExpenseSheet open={sheet.open} expense={sheet.expense} defaultDate={day}
         onClose={() => setSheet({ open: false, expense: null })} />
+      <PocketMoveSheet open={pocketSheet.open} pocket={pocketSheet.pocket} initialKind={pocketSheet.kind} initialDate={day}
+        onClose={() => setPocketSheet((p) => ({ ...p, open: false }))} />
       <IncomeSheet open={addIncome} item={null} onClose={() => setAddIncome(false)} />
       <JatahSheet open={editJatah} onClose={() => setEditJatah(false)} day={day} info={dayInfo} />
     </div>

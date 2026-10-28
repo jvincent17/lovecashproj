@@ -3,16 +3,18 @@ import Sheet from './Sheet.jsx'
 import AmountInput from './AmountInput.jsx'
 import { useData } from '../context/DataContext.jsx'
 import WalletPicker from './WalletPicker.jsx'
+import { SourcePicker } from './Pockets.jsx'
 
 const LAST = 'duitkara-last-wallet'
 const lastWallet = () => { try { return localStorage.getItem(LAST) || null } catch { return null } }
 
 /** Form tambah/edit pengeluaran. `expense` = null untuk tambah baru. */
-export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
-  const { categories, saveExpense, deleteExpense, today, walletById } = useData()
+export default function ExpenseSheet({ open, onClose, expense, defaultDate, defaultPocket = null }) {
+  const { categories, saveExpense, deleteExpense, today, walletById, pocketById } = useData()
   const [amount, setAmount] = useState(0)
   const [categoryId, setCategoryId] = useState(null)
   const [walletId, setWalletId] = useState(null)
+  const [pocketId, setPocketId] = useState(null)
   const [note, setNote] = useState('')
   const [date, setDate] = useState(today)
   const [busy, setBusy] = useState(false)
@@ -24,14 +26,15 @@ export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
     setNote(expense?.note ?? '')
     setWalletId(expense ? expense.wallet_id : (walletById[lastWallet()] ? lastWallet() : null))
     setDate(expense?.date ?? defaultDate ?? today)
-  }, [open, expense, defaultDate, today, categories])
+    setPocketId(expense ? (expense.pocket_id ?? null) : defaultPocket)
+  }, [open, expense, defaultDate, defaultPocket, today, categories])
 
   const submit = async (e) => {
     e.preventDefault()
     if (!amount) return
     setBusy(true)
     try {
-      await saveExpense({ id: expense?.id, amount, category_id: categoryId, wallet_id: walletId, note: note.trim() || null, date })
+      await saveExpense({ id: expense?.id, amount, category_id: categoryId, wallet_id: walletId, pocket_id: pocketId && pocketById[pocketId] ? pocketId : null, note: note.trim() || null, date })
       try { walletId ? localStorage.setItem(LAST, walletId) : localStorage.removeItem(LAST) } catch { /* */ }
       onClose()
     } catch { /* error tampil di banner */ } finally { setBusy(false) }
@@ -58,6 +61,8 @@ export default function ExpenseSheet({ open, onClose, expense, defaultDate }) {
             ))}
           </div>
         </div>
+
+        <SourcePicker value={pocketId} onChange={setPocketId} />
 
         <WalletPicker label="Bayar dari" value={walletId} onChange={setWalletId} />
 

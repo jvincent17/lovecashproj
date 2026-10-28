@@ -11,13 +11,14 @@ import WalletIcon from '../components/WalletIcon.jsx'
 const ALL = '__all'
 
 export default function History() {
-  const { period, today, categories, catById, wallets, walletById, members, memberName, expenses: ctxExpenses } = useData()
+  const { period, today, categories, catById, wallets, walletById, members, memberName, expenses: ctxExpenses, pockets, pocketById } = useData()
   const [from, setFrom] = useState(period?.start_date ?? addDays(today, -30))
   const [to, setTo] = useState(period?.end_date && period.end_date < today ? period.end_date : today)
   const [type, setType] = useState('all')
   const [cat, setCat] = useState(ALL)
   const [wallet, setWallet] = useState(ALL)
   const [who, setWho] = useState(ALL)
+  const [source, setSource] = useState(ALL)
   const [q, setQ] = useState('')
   const [showFilter, setShowFilter] = useState(false)
   const [rows, setRows] = useState([])
@@ -50,13 +51,14 @@ export default function History() {
       .filter((r) => cat === ALL || (r.kind === 'expense' && (r.category_id ?? 'none') === cat))
       .filter((r) => wallet === ALL || (r.wallet_id ?? 'none') === wallet)
       .filter((r) => who === ALL || r.created_by === who)
+      .filter((r) => source === ALL || (r.kind === 'expense' && (r.pocket_id ?? 'daily') === source))
       .filter((r) => {
         if (!term) return true
         const text = r.kind === 'income' ? r.name : `${r.note ?? ''} ${catById[r.category_id]?.name ?? ''}`
         return text.toLowerCase().includes(term) || String(r.amount).includes(term.replace(/\D/g, '') || '§')
       })
       .sort((a, b) => (a.date === b.date ? (a.created_at < b.created_at ? 1 : -1) : a.date < b.date ? 1 : -1))
-  }, [rows, type, cat, wallet, who, q, catById])
+  }, [rows, type, cat, wallet, who, source, q, catById])
 
   const outTotal = filtered.filter((r) => r.kind === 'expense').reduce((a, r) => a + Number(r.amount), 0)
   const inTotal = filtered.filter((r) => r.kind === 'income').reduce((a, r) => a + Number(r.amount), 0)
@@ -65,11 +67,11 @@ export default function History() {
     for (const r of filtered) { if (!m.has(r.date)) m.set(r.date, []); m.get(r.date).push(r) }
     return [...m.entries()]
   }, [filtered])
-  const activeFilters = [type !== 'all', cat !== ALL, wallet !== ALL, who !== ALL].filter(Boolean).length
+  const activeFilters = [type !== 'all', cat !== ALL, wallet !== ALL, who !== ALL, source !== ALL].filter(Boolean).length
 
   const doExport = async () => {
     setExporting(true)
-    try { await exportRows(filtered, { catById, walletById, memberName }, `duit-kara_riwayat_${from}_${to}.xlsx`) } finally { setExporting(false) }
+    try { await exportRows(filtered, { catById, walletById, memberName, pocketById }, `duit-kara_riwayat_${from}_${to}.xlsx`) } finally { setExporting(false) }
   }
 
   return (
@@ -116,6 +118,15 @@ export default function History() {
               {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </label>
+          {pockets.length > 0 && (
+            <label><span className="label">Sumber</span>
+              <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+                <option value={ALL}>Semua sumber</option>
+                <option value="daily">Jatah harian</option>
+                {pockets.map((k) => <option key={k.id} value={k.id}>{k.icon} {k.name}</option>)}
+              </select>
+            </label>
+          )}
           {members.length > 1 ? (
             <label><span className="label">Diinput oleh</span>
               <select className="input" value={who} onChange={(e) => setWho(e.target.value)}>
@@ -125,7 +136,7 @@ export default function History() {
             </label>
           ) : <span />}
           {activeFilters > 0 && (
-            <button onClick={() => { setType('all'); setCat(ALL); setWallet(ALL); setWho(ALL) }} className="col-span-2 text-xs text-accent text-left">Reset filter</button>
+            <button onClick={() => { setType('all'); setCat(ALL); setWallet(ALL); setWho(ALL); setSource(ALL) }} className="col-span-2 text-xs text-accent text-left">Reset filter</button>
           )}
         </section>
       )}
@@ -152,6 +163,7 @@ export default function History() {
                 const c = catById[r.category_id]
                 const w = r.wallet_id ? walletById[r.wallet_id] : null
                 const isIn = r.kind === 'income'
+                const k = r.pocket_id ? pocketById[r.pocket_id] : null
                 return (
                   <li key={`${r.kind}${r.id}`}>
                     <button disabled={isIn} onClick={() => setEdit({ open: true, expense: r })}
@@ -161,7 +173,7 @@ export default function History() {
                         <span className="block text-sm truncate">{isIn ? r.name : r.note || c?.name || 'Tanpa kategori'}</span>
                         <span className="flex items-center gap-1 text-xs text-muted truncate">
                           <WalletIcon wallet={w} className="size-3.5" rounded="rounded" />
-                          {w?.name ?? 'Unlocated'}{!isIn && c ? ` · ${c.name}` : ''}{members.length > 1 && r.created_by ? ` · ${memberName(r.created_by)}` : ''}
+                          {w?.name ?? 'Unlocated'}{k ? ` · ${k.icon} ${k.name}` : ''}{!isIn && c ? ` · ${c.name}` : ''}{members.length > 1 && r.created_by ? ` · ${memberName(r.created_by)}` : ''}
                         </span>
                       </span>
                       <span className={`text-sm tabular font-medium ${isIn ? 'text-accent' : ''}`}>{isIn ? '+' : '-'}{rupiah(r.amount)}</span>

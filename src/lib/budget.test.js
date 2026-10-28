@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildWeeks, computePlan, dailyStatus, allocate } from './budget.js'
+import { buildWeeks, computePlan, dailyStatus, allocate, periodSaldo } from './budget.js'
 import { cycleFor } from './dates.js'
 
 test('cycleFor tanggal gajian 25', () => {
@@ -104,4 +104,28 @@ test('minus hari ini langsung memotong jatah besok', () => {
   const st = dailyStatus(plan, spent, period.start_date, period.end_date, '2026-10-28')
   assert.equal(st['2026-10-29'].alloc, 80_000)
   assert.equal(st['2026-10-30'].alloc, 100_000)
+})
+
+test('kantong: disisihkan, ditarik dari minggu, dan dimasukkan ke jatah', () => {
+  const period = { start_date: '2026-10-25', end_date: '2026-11-24' } // 31 hari
+  const incomes = [{ amount: 3_400_000, date: '2026-10-25' }]
+  const moves = [
+    { pocket_id: 'heal', kind: 'fund', amount: 300_000, date: '2026-10-25' },
+    { pocket_id: 'dar', kind: 'from_week', amount: 50_000, date: '2026-10-29' }, // minggu 1: 29,30,31
+    { pocket_id: 'heal', kind: 'to_day', amount: 30_000, date: '2026-10-27' },
+  ]
+  const plan = computePlan({ period, incomes, pocketMoves: moves })
+  assert.equal(plan.flexible, 3_100_000)
+  assert.equal(plan.dailyBudget, 3_100_000 - 50_000 + 30_000)
+  const total = Object.values(plan.dayAlloc).reduce((a, v) => a + v, 0)
+  assert.equal(total, plan.dailyBudget)
+  assert.equal(plan.dayAlloc['2026-10-27'], 130_000)
+  assert.equal(plan.dayAlloc['2026-10-28'], 100_000) // sebelum tanggal tarik tidak berubah
+  assert.equal(plan.dayAlloc['2026-10-29'] + plan.dayAlloc['2026-10-30'] + plan.dayAlloc['2026-10-31'], 300_000 - 50_000)
+  assert.equal(plan.weeks[0].amount, 700_000 + 30_000 - 50_000)
+
+  const pockets = [{ id: 'heal', carry_over: false }, { id: 'dar', carry_over: true }]
+  const expenses = [{ amount: 10_000 }, { amount: 80_000, pocket_id: 'heal' }, { amount: 20_000, pocket_id: 'dar' }]
+  // 3.400.000 − 10.000 − 80.000 − 50.000 (ke Darurat) = 3.260.000
+  assert.equal(periodSaldo({ plan, expenses, pockets, pocketMoves: moves }), 3_260_000)
 })

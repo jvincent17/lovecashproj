@@ -19,15 +19,19 @@ async function save(sheets, fileName) {
 const wName = (walletById, id) => (id ? walletById[id]?.name ?? '-' : 'Unlocated Money')
 
 /** Satu periode lengkap: ringkasan, dana masuk, tagihan, pengeluaran. */
-export async function exportPeriod({ period, plan, saldo, spentTotal, incomes, bills, expenses, catById, walletById, memberName }) {
+const src = (pocketById, id) => (id ? pocketById?.[id]?.name ?? 'Kantong' : 'Jatah harian')
+
+export async function exportPeriod({ period, plan, saldo, spentTotal, incomes, bills, expenses, catById, walletById, memberName, pocketById = {}, pockets = [] }) {
   const summary = [
     [bold('Duit Kara — ringkasan periode'), null],
     ['Periode', `${period.start_date} s/d ${period.end_date}`],
     ['Dana bulan ini', num(plan.income)],
     ['Total tagihan', num(plan.billsTotal)],
     ['Tagihan sudah dibayar', num(plan.billsPaid)],
-    ['Budget harian/mingguan', num(plan.flexible)],
-    ['Total pengeluaran', num(spentTotal)],
+    ['Disisihkan ke kantong', num(plan.pocketFund ?? 0)],
+    ['Budget harian/mingguan', num(plan.dailyBudget ?? plan.flexible)],
+    ['Pengeluaran harian', num(spentTotal)],
+    ...pockets.map((k) => [`Saldo kantong ${k.name}`, num(k.balance)]),
     ['Saldo', num(saldo)],
   ]
   const inc = [
@@ -40,25 +44,25 @@ export async function exportPeriod({ period, plan, saldo, spentTotal, incomes, b
       b.paid ? 'Lunas' : 'Belum', day(b.paid_at), wName(walletById, b.wallet_id)]),
   ]
   const exp = [
-    ['Tanggal', 'Kategori', 'Catatan', 'Nominal', 'Lokasi', 'Diinput oleh'].map(bold),
+    ['Tanggal', 'Kategori', 'Catatan', 'Nominal', 'Sumber', 'Lokasi', 'Diinput oleh'].map(bold),
     ...[...expenses].sort((a, b) => (a.date < b.date ? -1 : 1)).map((e) => [day(e.date), catById[e.category_id]?.name ?? 'Tanpa kategori',
-      e.note ?? '', num(e.amount), wName(walletById, e.wallet_id), memberName(e.created_by)]),
+      e.note ?? '', num(e.amount), src(pocketById, e.pocket_id), wName(walletById, e.wallet_id), memberName(e.created_by)]),
   ]
   await save([
     { data: summary, sheet: 'Ringkasan', columns: [{ width: 26 }, { width: 26 }] },
     { data: inc, sheet: 'Dana masuk', columns: [{ width: 12 }, { width: 28 }, { width: 14 }, { width: 18 }, { width: 16 }], stickyRowsCount: 1 },
     { data: bil, sheet: 'Tagihan', columns: [{ width: 12 }, { width: 30 }, { width: 15 }, { width: 14 }, { width: 9 }, { width: 12 }, { width: 18 }], stickyRowsCount: 1 },
-    { data: exp, sheet: 'Pengeluaran', columns: [{ width: 12 }, { width: 18 }, { width: 30 }, { width: 14 }, { width: 18 }, { width: 16 }], stickyRowsCount: 1 },
+    { data: exp, sheet: 'Pengeluaran', columns: [{ width: 12 }, { width: 18 }, { width: 30 }, { width: 14 }, { width: 16 }, { width: 18 }, { width: 16 }], stickyRowsCount: 1 },
   ], `duit-kara_${period.start_date}_${period.end_date}.xlsx`)
 }
 
 /** Daftar transaksi hasil filter di halaman Riwayat. */
-export async function exportRows(rows, { catById, walletById, memberName }, fileName) {
+export async function exportRows(rows, { catById, walletById, memberName, pocketById = {} }, fileName) {
   const data = [
-    ['Tanggal', 'Jenis', 'Kategori / Nama', 'Catatan', 'Nominal', 'Lokasi', 'Diinput oleh'].map(bold),
+    ['Tanggal', 'Jenis', 'Kategori / Nama', 'Catatan', 'Nominal', 'Sumber', 'Lokasi', 'Diinput oleh'].map(bold),
     ...rows.map((r) => [day(r.date), r.kind === 'income' ? 'Dana masuk' : 'Pengeluaran',
       r.kind === 'income' ? r.name : catById[r.category_id]?.name ?? 'Tanpa kategori', r.kind === 'income' ? '' : r.note ?? '',
-      num(r.kind === 'income' ? r.amount : -r.amount), wName(walletById, r.wallet_id), memberName(r.created_by)]),
+      num(r.kind === 'income' ? r.amount : -r.amount), r.kind === 'income' ? '' : src(pocketById, r.pocket_id), wName(walletById, r.wallet_id), memberName(r.created_by)]),
   ]
-  await save([{ data, sheet: 'Transaksi', columns: [{ width: 12 }, { width: 13 }, { width: 22 }, { width: 30 }, { width: 14 }, { width: 18 }, { width: 16 }], stickyRowsCount: 1 }], fileName)
+  await save([{ data, sheet: 'Transaksi', columns: [{ width: 12 }, { width: 13 }, { width: 22 }, { width: 30 }, { width: 14 }, { width: 16 }, { width: 18 }, { width: 16 }], stickyRowsCount: 1 }], fileName)
 }

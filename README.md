@@ -76,7 +76,13 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 - **Tagihan** masuk ke periode sesuai tanggal jatuh temponya, dan bisa dilihat untuk bulan ini maupun bulan depan. Tagihan yang dicentang (sudah dibayar) mengurangi **Saldo**. Tagihan bertanda "ulangi setiap bulan" otomatis disalin saat periode baru dibuat. Tagihan jenis Cicilan/Kredit bisa dihubungkan ke catatan hutang.
 - **Budget harian/mingguan** = dana bulan ini − semua tagihan periode itu. Nilainya dibagi ke minggu (per 7 hari sejak tanggal gajian), lalu ke hari. Jatah minggu atau hari bisa diatur manual.
 - **Sisa & minus harian** pindah penuh ke jatah 1 hari berikutnya saja (lusa kembali normal). Sisa baru dihitung setelah harinya lewat; minus hari ini langsung memotong jatah besok. Jatah hari ini bisa diubah langsung dari halaman **Hari ini**.
-- **Saldo** = dana bulan ini − tagihan yang sudah dibayar − pengeluaran.
+- **Saldo** = dana bulan ini − tagihan yang sudah dibayar − pengeluaran − uang yang dipindah ke kantong "numpuk".
+- **Kantong khusus** (Healing, Cheating, Dana Darurat, dll.) ada di menu **Bulan**. Uang kantong di luar jatah harian:
+  - *Isi dari dana bulan ini* → budget harian dibagi ulang tanpa uang itu. Bisa juga diisi otomatis saat membuat periode baru.
+  - *Tarik dari jatah minggu* (tombol **Kantong** di menu Minggu) → jatah hari itu s/d akhir minggu dipotong.
+  - *Pindah ke jatah harian* (ketuk kantong di menu Hari ini) → jatah tanggal itu bertambah.
+  - Saat mencatat pengeluaran, pilih **Pakai dari** kantong → jatah harian tidak berkurang.
+  - Kantong **Reset tiap periode**: sisanya ikut "Sisa bulan lalu". Kantong **Numpuk terus**: saldonya disimpan dan bertambah antarperiode.
 - **Lokasi dana** (GoPay, Cash, BCA, dll.) bisa ditambah bebas, dengan emoji atau logo sendiri. Dana masuk, pengeluaran, dan tagihan dibayar masing-masing bisa memilih lokasi. Yang tidak dipilih masuk ke **Unlocated Money**. Gunakan **Pindah dana** untuk memindahkan uang antarlokasi. Saldo tiap lokasi dihitung otomatis sepanjang waktu. Menghapus lokasi mengembalikan saldo dan transaksinya ke Unlocated Money.
 
 - **Bawa sisa bulan lalu:** saat membuat periode baru, sisa saldo periode sebelumnya bisa dibawa sebagai dana "Sisa bulan lalu". Dana ini menambah budget, tapi tidak menambah saldo lokasi (uangnya memang sudah ada di lokasi masing-masing).
@@ -88,7 +94,7 @@ Setelah itu, setiap `git push` ke branch `main` akan otomatis ter-deploy ulang.
 ## Migrasi database
 
 Kalau database sudah berjalan, jalankan file di `supabase/migrations/` yang belum pernah dijalankan, **berurutan**:
-`002_foto.sql` → `003_lokasi_dana.sql` → `004_fitur_lanjutan.sql` → `005_bootstrap.sql` → `006_mode_minus.sql`. Untuk database baru, cukup jalankan `schema.sql`.
+`002_foto.sql` → `003_lokasi_dana.sql` → `004_fitur_lanjutan.sql` → `005_bootstrap.sql` → `006_mode_minus.sql` → `007_kantong.sql`. Untuk database baru, cukup jalankan `schema.sql`.
 
 ## Struktur folder
 

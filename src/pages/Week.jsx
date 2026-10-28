@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import { PiggyBank, Pencil, Plus } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { rupiah } from '../lib/format.js'
 import { fmtDay, fmtShort, fmtRange, fmtLong } from '../lib/dates.js'
@@ -10,12 +10,14 @@ import NoPeriod from '../components/NoPeriod.jsx'
 import ExpenseSheet from '../components/ExpenseSheet.jsx'
 import ExpenseList from '../components/ExpenseList.jsx'
 import CategoryBreakdown from '../components/CategoryBreakdown.jsx'
+import { PocketMoveSheet } from '../components/Pockets.jsx'
 
 export default function Week() {
-  const { period, plan, status, expenses, today, setWeekAmount } = useData()
+  const { period, plan, status, expenses, dailyExpenses, pockets, today, setWeekAmount } = useData()
   const [idx, setIdx] = useState(null)
   const [editWeek, setEditWeek] = useState(false)
   const [day, setDay] = useState(null)
+  const [toPocket, setToPocket] = useState(false)
 
   useEffect(() => {
     if (!plan) return
@@ -28,7 +30,7 @@ export default function Week() {
   if (!week) return null
 
   const weekItems = expenses.filter((e) => e.date >= week.start && e.date <= week.end)
-  const spent = weekItems.reduce((a, e) => a + Number(e.amount), 0)
+  const spent = dailyExpenses.filter((e) => e.date >= week.start && e.date <= week.end).reduce((a, e) => a + Number(e.amount), 0)
 
   return (
     <div className="space-y-4">
@@ -49,7 +51,12 @@ export default function Week() {
             <p className="text-3xl font-semibold tabular mt-1">{rupiah(week.amount)}</p>
             <p className="text-xs text-muted mt-1">{week.isCustom ? 'Diatur manual' : 'Dibagi otomatis dari budget bulanan'}</p>
           </div>
-          <button onClick={() => setEditWeek(true)} className="btn-ghost h-9 px-3"><Pencil size={15} /> Ubah</button>
+          <div className="flex flex-col gap-2 shrink-0">
+            <button onClick={() => setEditWeek(true)} className="btn-ghost h-9 px-3"><Pencil size={15} /> Ubah</button>
+            {pockets.length > 0 && week.end >= today && (
+              <button onClick={() => setToPocket(true)} className="btn-ghost h-9 px-3"><PiggyBank size={15} /> Kantong</button>
+            )}
+          </div>
         </div>
         <Bar value={spent} max={week.amount} className="mt-5" />
         <div className="flex justify-between text-sm mt-2">
@@ -82,7 +89,7 @@ export default function Week() {
                   </div>
                   <Bar value={s.spent} max={Math.max(0, s.available)} className="mt-2" />
                   <div className="flex justify-between text-xs text-muted mt-1.5 money">
-                    <span>Terpakai {rupiah(s.spent)}{s.adjust < 0 && <span className="text-danger"> · potong {rupiah(-s.adjust)}</span>}{s.adjust > 0 && <span className="text-accent"> · +{rupiah(s.adjust)} dari sisa</span>}</span>
+                    <span>Terpakai {rupiah(s.spent)}{s.adjust < 0 && <span className="text-danger"> · potong {rupiah(-s.adjust)}</span>}{s.adjust > 0 && <span className="text-accent"> · +{rupiah(s.adjust)} dari sisa</span>}{d.pocket > 0 && <span className="text-accent"> · +{rupiah(d.pocket)} kantong</span>}{d.pocket < 0 && <span> · {rupiah(-d.pocket)} ke kantong</span>}</span>
                     <span>{s.carryIn !== 0 && `${s.carryIn > 0 ? '+' : ''}${rupiah(s.carryIn)} dari kemarin`}</span>
                   </div>
                 </div>
@@ -100,6 +107,8 @@ export default function Week() {
       <WeekSheet open={editWeek} onClose={() => setEditWeek(false)} week={week}
         onSave={(v) => setWeekAmount(week.index, v)} />
       <DaySheet day={day} onClose={() => setDay(null)} />
+      <PocketMoveSheet open={toPocket} initialKind="from_week" initialDate={week.start > today ? week.start : today}
+        onClose={() => setToPocket(false)} />
     </div>
   )
 }
